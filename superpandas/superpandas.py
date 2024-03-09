@@ -18,7 +18,7 @@ class ForeignKey:
     src_column: str
     tgt_sdf: str
     tgt_column: str
-    
+     
 @dataclass
 class SuperDataFrame:
     """
@@ -28,26 +28,25 @@ class SuperDataFrame:
     - foreign_keys: list of foreign keys
     Addtionally it adds dataframe column names and dtypes.
     """
-    table: pd.DataFrame
+    df: pd.DataFrame
     name: Optional[str] = None
     desc: Optional[str] = None
     foreign_keys: Optional[List[ForeignKey]] = None
     
     def __post_init__(self):
-        self.columns = list(self.table.columns)
-        self.dtypes = {k:str(v) for k,v in self.table.dtypes.items()}
+        self.columns = list(self.df.columns)
+        self.dtypes = {k:str(v) for k,v in self.df.dtypes.items()}
         
     def __eq__(self, __value: object) -> bool:
-        return self.table.equals(__value.table)
+        return self.df.equals(__value.table)
     
     def equals(self, __value: object) -> bool:
-        return self.table.equals(__value.table)
+        return self.df.equals(__value.df)
     
     def get_architecture(self):
         """
         Returns the architecture of SuperDataFrame
         """
-        # arch = {}
         arch = self.dtypes
         if self.foreign_keys is not None:
             arch['foreign_keys'] = {}
@@ -71,6 +70,14 @@ class SuperDataFrame:
         with open(path, 'rb') as f:
             cls = pickle.load(f)
             return cls
+        
+    def set_description(self, text: str, force=False):
+        """
+        Sets the description of the SuperDataFrame if not already set. If force is True, it replaces the existing description.
+        """
+        if self.desc is not None and not force:
+            raise ValueError("SuperDataFrame already has a description. Use `force=True` to replace it.")
+        self.desc = text
     
 class PandaPack:
     """
@@ -78,28 +85,28 @@ class PandaPack:
     """
     
     def __init__(self, 
-                 tables: Optional[Union[SuperDataFrame,pd.DataFrame,List[SuperDataFrame],List[pd.DataFrame]]]=None, 
+                 sdf: Optional[Union[SuperDataFrame,pd.DataFrame,List[SuperDataFrame],List[pd.DataFrame]]]=None, 
                  summary: Optional[str] = None):
                    
-        if isinstance(tables, list):
-            if isinstance(tables[0],SuperDataFrame):
-                self.tables = tables
+        if isinstance(sdf, list):
+            if isinstance(sdf[0],SuperDataFrame):
+                self.sdf = sdf
             else: # list of pd.DataFrames
-                self.tables = [SuperDataFrame(table=table) for table in tables]
-        elif isinstance(tables, SuperDataFrame):
-            self.tables = [tables]
-        elif isinstance(tables, pd.DataFrame):
-            self.tables = [SuperDataFrame(table=tables)]
-        elif tables==None:
-            self.tables = []
+                self.sdf = [SuperDataFrame(df=table) for table in sdf]
+        elif isinstance(sdf, SuperDataFrame):
+            self.sdf = [sdf]
+        elif isinstance(sdf, pd.DataFrame):
+            self.sdf = [SuperDataFrame(df=sdf)]
+        elif sdf==None:
+            self.sdf = {}
         else:
-            raise ValueError(f"tables must be a SuperDataFrame, pd.DataFrame, or a list of SuperDataFrames/pd.DataFrames. Received {type(tables)}")
+            raise ValueError(f"tables must be a SuperDataFrame, pd.DataFrame, or a list of SuperDataFrames/pd.DataFrames. Received {type(sdf)}")
         
-        self.num_tables_wo_name = len([table for table in self.tables if table.name==None])
+        self.num_tables_wo_name = len([table for table in self.sdf if table.name==None])
         for i in range(self.num_tables_wo_name):
-            if self.tables[i].name is None:
-                self.tables[i].name = f"table_{i}"
-        self.tables = {table.name: table for table in self.tables}
+            if self.sdf[i].name is None:
+                self.sdf[i].name = f"table_{i}"
+        self.sdf = {table.name: table for table in self.sdf}
         self.summary = summary
         self.verify()
 
@@ -110,46 +117,47 @@ class PandaPack:
         return json.dumps(self.get_architecture(),indent=2)
     
     def __eq__(self, __value: object) -> bool:
-        for table_name in self.tables:
-            if not self.tables[table_name].equals(__value.tables[table_name]):
+        for table_name in self.sdf:
+            if not self.sdf[table_name].equals(__value.tables[table_name]):
                 return False
         return True
     
-    def add_table(self, table: Union[SuperDataFrame,pd.DataFrame]):
+    def add_sdf(self, table: Union[SuperDataFrame,pd.DataFrame]):
         """
-        Adds a table to the SuperDataFrame."""
+        Adds a pd.DataFrame/SuperDataFrame to PandaPack.
+        """
         if isinstance(table, pd.DataFrame):
             table_name = f"table_{self.num_tables_wo_name}"
-            table = SuperDataFrame(table=table, name=table_name)
+            table = SuperDataFrame(df=table, name=table_name)
             self.num_tables_wo_name+=1
-        self.tables[table.name] = table
+        self.sdf[table.name] = table
         
-    def pop_table(self, table_name: str):
+    def pop_sdf(self, table_name: str):
         """
         Removes a table with the given name.
         """
-        return self.tables.pop(table_name,None)
+        return self.sdf.pop(table_name,None)
     
-    def get_table(self, table_name: str):
+    def get_sdf(self, sdf_name: str):
         """
         Returns a table with the given name.
         """
-        return self.tables.get(table_name,None)
+        return self.sdf.get(sdf_name,None)
     
     def get_architecture(self):
         """
         Returns the architecture of SuperDataFrame in the form of a dictionary, that can be used in a query to the LLM.
         """
         arch = {}
-        for name,table in self.tables.items():
+        for name,table in self.sdf.items():
             arch[name] = table.get_architecture()
         return arch
     
-    def get_table_names(self):
+    def get_sdf_names(self):
         """
         Returns a list of table names.
         """
-        return list(self.tables.keys())
+        return list(self.sdf.keys())
     
     def verify(self):
         pass
@@ -158,25 +166,25 @@ class PandaPack:
         """
         Adds a foreign key between two tables.
         """
-        assert self.get_table(src_sdf) is not None, f"Table {src_sdf} does not exist."
-        assert self.get_table(tgt_sdf) is not None, f"Table {tgt_sdf} does not exist."
-        assert src_column in self.get_table(src_sdf).columns, f"Column {src_column} does not exist in table {src_sdf}."
-        assert tgt_column in self.get_table(tgt_sdf).columns, f"Column {tgt_column} does not exist in table {tgt_sdf}."
+        assert self.get_sdf(src_sdf) is not None, f"Table {src_sdf} does not exist."
+        assert self.get_sdf(tgt_sdf) is not None, f"Table {tgt_sdf} does not exist."
+        assert src_column in self.get_sdf(src_sdf).columns, f"Column {src_column} does not exist in table {src_sdf}."
+        assert tgt_column in self.get_sdf(tgt_sdf).columns, f"Column {tgt_column} does not exist in table {tgt_sdf}."
         
-        src_table = self.get_table(src_sdf)
+        src_sdf = self.get_sdf(src_sdf)
         
         fk = ForeignKey(src_sdf, src_column, tgt_sdf, tgt_column)
-        if src_table.foreign_keys is None:
-            src_table.foreign_keys = [fk]
+        if src_sdf.foreign_keys is None:
+            src_sdf.foreign_keys = [fk]
         else:
-            src_table.foreign_keys.append(fk)
-    
-    def add_summary(self, summary: str):
-        if self.summary is not None:
-            raise ValueError("SuperDataFrame already has a summary. Use SuperDataFrame.set_summary() to replace it.")
-        self.summary = summary
+            src_sdf.foreign_keys.append(fk)
         
-    def set_summary(self, summary: str):
+    def set_summary(self, summary: str, force=False):
+        """
+        Sets the summary of the PandaPack if not already set. If `force` is True, it replaces the existing summary.
+        """
+        if self.summary is not None and not force:
+            raise ValueError("SuperDataFrame already has a summary. Use `force=True` to replace it.")
         self.summary = summary
         
     def get_summary(self):
@@ -204,7 +212,7 @@ class PandaPack:
 @dataclass
 class SuperPandasConfig:
     """
-    Creates a Config object which is a dictionary of configuration parameters for a SuperDataFrame.
+    Creates a Config object which is a dictionary of configuration parameters for a SuperPandas.
     """
     api_key: Optional[str]=None
     llm_type: Optional[str]=None
@@ -240,12 +248,13 @@ class SuperPandas:
         else:
             ValueError(f"llm_type must be one of 'openai', 'tgi', or 'vllm'. Received {self.config.llm_type}")
         
-    def add_pdp(self, pdp: PandaPack):
-        if self.pdp is not None:
-            raise ValueError("This SuperPandas instance already has a PandaPack. Use SuperPandas.set_pdp() to replace it.")
-        self.pdp = pdp
+    def set_pdp(self, pdp: PandaPack, force=False):
+        """
+        Sets the PandaPack for the SuperPandas instance. If `force` is True, it replaces the existing PandaPack.
+        """
         
-    def set_pdp(self, pdp: PandaPack):
+        if self.pdp is not None and not force:
+            raise ValueError("This SuperPandas instance already has a PandaPack. Use `force=True` to replace it.")
         self.pdp = pdp
     
     def __str__(self):
@@ -262,12 +271,11 @@ class SuperPandas:
         
         return self.query(query)
     
-    def get_table_description_from_llm(self, table_name: str):
+    def get_sdf_description_from_llm(self, table_name: str):
         """
-        Queries the LLM for a description of the given table.
+        Queries the LLM for a description of the given SDF.
         """
-        
-        arch = {table_name:self.pdp.get_table(table_name).get_architecture()}
+        arch = {table_name:self.pdp.get_sdf(table_name).get_architecture()}
         query = get_table_description_prompt.format(arch=arch)
         
         return self.query(query,add_arch=False)
