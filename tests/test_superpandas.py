@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 import sys
 import random
-sys.path.append(str(Path(__file__).parent.parent/"src"))
+sys.path.append(str(Path(__file__).parent.parent/"superpandas"))
 from superpandas import SuperDataFrame, PandaPack, SuperPandas, SuperPandasConfig
 
 random_integers = lambda : [random.randint(1, 100) for _ in range(3)]
