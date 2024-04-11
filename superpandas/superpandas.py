@@ -1,3 +1,4 @@
+import pdb
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass
@@ -78,7 +79,82 @@ class SuperDataFrame:
         if self.desc is not None and not force:
             raise ValueError("SuperDataFrame already has a description. Use `force=True` to replace it.")
         self.desc = text
+
+class SuperDataFrameV2(pd.DataFrame):
+    """
+    Creates a SuperDataFrame object which is a wrapper around a Pandas DataFrame. It adds following optional metadata to the DataFrame:
+    - name: name of the table
+    - desc: description of the table
+    - foreign_keys: list of foreign keys
+    Addtionally it adds dataframe column names and dtypes.
+    """
     
+    _metadata = ["name", "desc", "foreign_keys"]
+    
+    def __init__(self,
+                 *args, **kwargs,
+                 ) -> None:
+        self.name = kwargs.pop('name',None)
+        self.desc = kwargs.pop('desc',None)
+        self.foreign_keys = kwargs.get('foreign_keys',None)        
+        super().__init__(*args, **kwargs,)
+
+    @property
+    def _constructor(self):
+        return SuperDataFrame
+    
+    # def __repr__(self): #TODO: Fix this
+    #     # df_repr = super().__repr__()
+    #     pdb.set_trace()
+    #     return {self.name: repr(super())}
+    
+    # def __str__(self):
+    #     # str_ = f"SuperDataFrame:\nname: {self.name}\ndescription: {self.desc}\n"+super().__str__()
+    #     return super().__str__()
+
+    def __setattr__(self, attr, val): # https://github.com/geopandas/geopandas/blob/514f975298b940fca1a39917ff35aa12b149a1e7/geopandas/geodataframe.py#L198C1-L203C43
+        # have to special case b/c pandas tries to use as column...
+        if attr in ["name","desc","foreign_keys"]:
+            object.__setattr__(self, attr, val)
+        else:
+            super().__setattr__(attr, val)
+            
+    def get_architecture(self):
+        """
+        Returns the architecture of SuperDataFrame
+        """
+        arch = self.dtypes
+        if self.foreign_keys is not None:
+            arch['foreign_keys'] = {}
+            for fk in self.foreign_keys:
+                arch['foreign_keys'][fk.src_column] = (fk.tgt_sdf,fk.tgt_column)
+        
+        return arch
+    
+    def to_disk(self, path: Path):
+        """
+        Saves the SuperDataFrame to disk.
+        """
+        with open(path, 'wb') as f:
+            pickle.dump(self, f)
+    
+    @classmethod
+    def from_disk(cls, path: Path):
+        """
+        Loads the SuperDataFrame from disk.
+        """
+        with open(path, 'rb') as f:
+            cls = pickle.load(f)
+            return cls
+        
+    def set_description(self, text: str, force=False):
+        """
+        Sets the description of the SuperDataFrame if not already set. If force is True, it replaces the existing description.
+        """
+        if self.desc is not None and not force:
+            raise ValueError("SuperDataFrame already has a description. Use `force=True` to replace it.")
+        self.desc = text
+        
 class PandaPack:
     """
     Creates a PandaPack object which is a collection of SuperDataFrames.
@@ -122,15 +198,16 @@ class PandaPack:
                 return False
         return True
     
-    def add_sdf(self, table: Union[SuperDataFrame,pd.DataFrame]):
+    def add_sdf(self, df: Union[SuperDataFrame,pd.DataFrame]):
         """
         Adds a pd.DataFrame/SuperDataFrame to PandaPack.
         """
-        if isinstance(table, pd.DataFrame):
+        if isinstance(df, pd.DataFrame):
             table_name = f"table_{self.num_tables_wo_name}"
-            table = SuperDataFrame(df=table, name=table_name)
+            df = SuperDataFrame(df=df, name=table_name)
             self.num_tables_wo_name+=1
-        self.sdf[table.name] = table
+        assert self.sdf.get(df.name) is None, f"Table {df.name} already exists."
+        self.sdf[df.name] = df
         
     def pop_sdf(self, table_name: str):
         """
@@ -162,22 +239,31 @@ class PandaPack:
     def verify(self):
         pass
     
-    def add_foreign_key(self, src_sdf: str, src_column: str, tgt_sdf: str, tgt_column: str):
+    def add_foreign_key(self,
+                        fk: Optional[ForeignKey]=None, 
+                        src_sdf: Optional[str]=None, 
+                        src_column: Optional[str]=None,
+                        tgt_sdf: Optional[str]=None,
+                        tgt_column: Optional[str]=None):
         """
         Adds a foreign key between two tables.
         """
-        assert self.get_sdf(src_sdf) is not None, f"Table {src_sdf} does not exist."
-        assert self.get_sdf(tgt_sdf) is not None, f"Table {tgt_sdf} does not exist."
-        assert src_column in self.get_sdf(src_sdf).columns, f"Column {src_column} does not exist in table {src_sdf}."
-        assert tgt_column in self.get_sdf(tgt_sdf).columns, f"Column {tgt_column} does not exist in table {tgt_sdf}."
+        assert fk is not None or (src_sdf is not None and src_column is not None and tgt_sdf is not None and tgt_column is not None), "Either `fk` or `src_sdf`, `src_column`, `tgt_sdf`, and `tgt_column` must be provided."
         
-        src_sdf = self.get_sdf(src_sdf)
+        if fk is None:
+            assert self.get_sdf(src_sdf) is not None, f"Table {src_sdf} does not exist."
+            assert self.get_sdf(tgt_sdf) is not None, f"Table {tgt_sdf} does not exist."
+            assert src_column in self.get_sdf(src_sdf).columns, f"Column {src_column} does not exist in table {src_sdf}."
+            assert tgt_column in self.get_sdf(tgt_sdf).columns, f"Column {tgt_column} does not exist in table {tgt_sdf}."
         
-        fk = ForeignKey(src_sdf, src_column, tgt_sdf, tgt_column)
-        if src_sdf.foreign_keys is None:
-            src_sdf.foreign_keys = [fk]
+            fk = ForeignKey(src_sdf, src_column, tgt_sdf, tgt_column)
+        
+        sdf = self.get_sdf(fk.src_sdf)
+            
+        if sdf.foreign_keys is None:
+            sdf.foreign_keys = [fk]
         else:
-            src_sdf.foreign_keys.append(fk)
+            sdf.foreign_keys.append(fk)
         
     def set_summary(self, summary: str, force=False):
         """
@@ -220,7 +306,18 @@ class SuperPandasConfig:
     openai_max_retries: Optional[int]=None
     openai_base_url: Optional[str]=None
     timeout: Optional[float]=None
+
+@dataclass
+class PromptTemplate:
+    """
+    Creates a PromptTemplate object which is a dictionary of prompts for querying the LLM.
+    """
+    prompt: str
     
+    def __post_init__(self):
+        assert 'arch' in self.prompt, r"Prompt must contain the string '{arch}' which will be replaced by the architecture of the SuperDataFrame."
+        self.prompt = self.prompt.strip()
+   
 class SuperPandas:
     
     def __init__(self,

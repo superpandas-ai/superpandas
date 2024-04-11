@@ -3,7 +3,7 @@
 ## Introduction
 SuperPandas is a Python library that extends the functionality of the popular data manipulation library, Pandas. It uses Large (and Small) Language Models to provide a natural language interface to Pandas. This allows users to write code in natural language, which is then converted to Python code that can be executed by Pandas.. The aim is to make data manipulation easier and more accessible to non-technical users. SuperPandas is built on top of Pandas and is designed to be used in conjunction with it. It is not a replacement for Pandas, but rather a complement to it.
 
-Additionally, the project aims to interface other data science related libraries such as Scikit-learn, and Matplotlib in the future.
+Additionally, the project aims to include other data science related libraries such as Scikit-learn, and Matplotlib in the future.
 
 ## Installation
 To install SuperPandas, you can either use pip:
@@ -23,7 +23,7 @@ SuperPandas adds a few new concepts to Pandas DataFrame to make it more amenable
 ![diagram](architecture.png)
 
 ### SuperDataFrame (SDF):
-A SuperDataFrame is a subclass of Pandas' DataFrame. It is a container for data, and has all the functionality of a Pandas DataFrame, plus some additional properties and methods that allow it to be used with SuperPandas' natural language interface. The additional properties are :
+A SuperDataFrame is ~~a subclass of Pandas' DataFrame~~(not yet. In works. Presently it's a composition). It is a container for data, and has all the functionality of a Pandas DataFrame, plus some additional attributes and methods that allow it to be used with SuperPandas' natural language interface. The additional attributes are :
 -   DataFrame `name` and `description` : They are used in the prompts to LLMClient. They can be manually set by the user or obtained by the LLMClient.
 -   DataFrame column names and datatypes : They are also used in the prompts to LLMClient and are extracted from the underlying DataFrame. 
 
@@ -33,10 +33,10 @@ Additionally there is a ForeignKey datastructure that is used to store relations
 A ForeignKey is a Python dataclass that is used to store relationships between SuperDataFrames. It includes information about source and target SDF and the columns that are used to join them. This informatiom is useful when we have a collection of SDF in the form of a PandaPack.
 
 ### PandaPack
-A PandaPack is a collection of SuperDataFrames. It is used to store and manage multiple SuperDataFrames, and provides methods for working with them as a group. The additional property of PandasPack is a `summary` attribute that is used to store a summary of the data in the PandaPack. It is used by the prompt in the LLMClient.
+A PandaPack is a collection of SuperDataFrames; something like a database in SQL which has multiple tables. It is used to store and manage multiple SuperDataFrames linked together with ForeignKeys, and provides methods for working with them as a group. The additional property of PandasPack is a `summary` attribute that is used to store a summary of the database that constitutes the PandaPack. It is used by the prompt in the LLMClient. This summary can be provided by user or obtained from the LLMClient.
 
 ### LLMClient
-LLMClient is a class that is used to interface with a Large (or Small) Language Model. It provides a uniform interface to various inference engines. Presently three inference engines are supported: OpenAI's [python client](https://github.com/openai/openai-python), HuggingFace's [TGI engine](https://huggingface.co/docs/text-generation-inference/en/index)] and [vLLM](https://github.com/vllm-project/vllm).
+LLMClient is a class that is used to interface with a Large (or Small) Language Model. It provides a uniform interface to various inference engines. Presently three inference engines are supported: OpenAI's [python API](https://github.com/openai/openai-python), HuggingFace's [TGI engine](https://huggingface.co/docs/text-generation-inference/en/index) and [vLLM](https://github.com/vllm-project/vllm).
 
 ### SuperPandasConfig
 It is an extensible configuration class that is used to store the configuration of the SuperPandas library. Presently it has configuration for the LLMClient.
@@ -47,7 +47,7 @@ This is the main class that the user interacts with to use SuperPandas. It is in
 ### PromptTemplates
 
 ## Usage
-The project offers both a webapp and a Python library. The webapp can be accessed [here](https://superpandas.streamlit.app/). The Python library can be used as follows:
+The project offers both a webapp and a Python API. The webapp can be accessed [here](https://superpandas.streamlit.app/). The Python library can be used as follows:
 
 ```python
 import superpandas as spd

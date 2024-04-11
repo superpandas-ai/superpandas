@@ -17,6 +17,7 @@ pip-wheel-metadata/
 .vscode/
 /*.iml
 pyrightconfig.json
+debug.py
 
 
 # jupyter notebooks

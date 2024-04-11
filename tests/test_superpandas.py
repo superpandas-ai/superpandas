@@ -33,12 +33,12 @@ def test_super_dataframe_init_with_list_of_tables():
     assert 'Table2' in pdp.sdf
 
 def test_add_dataframe_without_name():
-    sdf = PandaPack(sdf=sample_df())
+    pdp = PandaPack(sdf=sample_df())
     new_sdf = SuperDataFrame(name='NewTable', df=sample_df())
-    sdf.add_sdf(new_sdf)
-    assert len(sdf.sdf) == 2
-    assert 'table_0' in sdf.sdf
-    assert 'NewTable' in sdf.sdf
+    pdp.add_sdf(new_sdf)
+    assert len(pdp.sdf) == 2
+    assert 'table_0' in pdp.sdf
+    assert 'NewTable' in pdp.sdf
     
 def test_add_dataframe_with_name():
     pdp = PandaPack(sdf=sample_df())
@@ -66,7 +66,7 @@ def test_add_foreign_key():
     sdf1 = SuperDataFrame(name='Table1', df=sample_df())
     sdf2 = SuperDataFrame(name='Table2', df=sample_df())
     pdp = PandaPack(sdf=[sdf1, sdf2])
-    pdp.add_foreign_key('Table1', 'A', 'Table2', 'B')
+    pdp.add_foreign_key(src_sdf='Table1', src_column='A', tgt_sdf='Table2', tgt_column='B')
     assert len(sdf1.foreign_keys) == 1
     assert sdf2.foreign_keys == None  # No back-references are added
 
@@ -87,7 +87,7 @@ def test_openai_client():
     sdf1 = SuperDataFrame(name='Table1', df=sample_df())
     sdf2 = SuperDataFrame(name='Table2', df=sample_df())
     pdp = PandaPack(sdf=[sdf1, sdf2])
-    pdp.add_foreign_key('Table1', 'A', 'Table2', 'B')
+    pdp.add_foreign_key(src_sdf='Table1', src_column='A', tgt_sdf='Table2', tgt_column='B')
     spd = SuperPandas(pdp=pdp, config=config)
     output = spd.get_pdp_summary_from_llm()
     response = output.choices[0].message.content
@@ -104,7 +104,7 @@ def test_tgi_client():
     sdf1 = SuperDataFrame(name='Table1', df=sample_df())
     sdf2 = SuperDataFrame(name='Table2', df=sample_df())
     pdp = PandaPack(sdf=[sdf1, sdf2])
-    pdp.add_foreign_key('Table1', 'A', 'Table2', 'B')
+    pdp.add_foreign_key(src_sdf='Table1', src_column='A', tgt_sdf='Table2', tgt_column='B')
     spd = SuperPandas(pdp=pdp, config=config)
     response = spd.get_pdp_summary_from_llm()
     
