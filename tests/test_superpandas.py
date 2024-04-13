@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 import random
 sys.path.append(str(Path(__file__).parent.parent/"superpandas"))
-from superpandas import SuperDataFrame, PandaPack, SuperPandas, SuperPandasConfig
+from superpandas import SuperDataFrame, PandaPack, SuperPandas, SuperPandasConfig, ForeignKey
 
 random_integers = lambda : [random.randint(1, 100) for _ in range(3)]
 
@@ -67,8 +67,10 @@ def test_add_foreign_key():
     sdf2 = SuperDataFrame(name='Table2', df=sample_df())
     pdp = PandaPack(sdf=[sdf1, sdf2])
     pdp.add_foreign_key(src_sdf='Table1', src_column='A', tgt_sdf='Table2', tgt_column='B')
-    assert len(sdf1.foreign_keys) == 1
-    assert sdf2.foreign_keys == None  # No back-references are added
+    assert len(pdp.foreign_keys) == 1
+    fk = ForeignKey(src_sdf='Table1', src_column='B', tgt_sdf='Table2', tgt_column='A')
+    pdp.add_foreign_key(fk)
+    assert len(pdp.foreign_keys) == 2
 
 def test_to_and_from_disk(tmp_path):
     sdf = SuperDataFrame(name='table_0', df=sample_df())

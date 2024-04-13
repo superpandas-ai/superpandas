@@ -26,13 +26,11 @@ class SuperDataFrame:
     Creates a SuperDataFrame object which is a wrapper around a Pandas DataFrame. It adds following metadata to the DataFrame:
     - name: name of the table
     - desc: description of the table
-    - foreign_keys: list of foreign keys
     Addtionally it adds dataframe column names and dtypes.
     """
     df: pd.DataFrame
     name: Optional[str] = None
     desc: Optional[str] = None
-    foreign_keys: Optional[List[ForeignKey]] = None
     
     def __post_init__(self):
         self.columns = list(self.df.columns)
@@ -49,11 +47,6 @@ class SuperDataFrame:
         Returns the architecture of SuperDataFrame
         """
         arch = self.dtypes
-        if self.foreign_keys is not None:
-            arch['foreign_keys'] = {}
-            for fk in self.foreign_keys:
-                arch['foreign_keys'][fk.src_column] = (fk.tgt_sdf,fk.tgt_column)
-        
         return arch
     
     def to_disk(self, path: Path):
@@ -157,12 +150,14 @@ class SuperDataFrameV2(pd.DataFrame):
         
 class PandaPack:
     """
-    Creates a PandaPack object which is a collection of SuperDataFrames.
+    Creates a PandaPack object which is a collection of SuperDataFrames and optional foreign keys to connect them.
     """
     
     def __init__(self, 
                  sdf: Optional[Union[SuperDataFrame,pd.DataFrame,List[SuperDataFrame],List[pd.DataFrame]]]=None, 
-                 summary: Optional[str] = None):
+                 summary: Optional[str] = None,
+                 foreign_keys: Optional[Union[ForeignKey,List[ForeignKey]]] = None
+                 ):
                    
         if isinstance(sdf, list):
             if isinstance(sdf[0],SuperDataFrame):
@@ -182,8 +177,10 @@ class PandaPack:
         for i in range(self.num_tables_wo_name):
             if self.sdf[i].name is None:
                 self.sdf[i].name = f"table_{i}"
-        self.sdf = {table.name: table for table in self.sdf}
+        self.sdfs = {table.name: table for table in self.sdf}
         self.summary = summary
+        self.foreign_keys= [] if foreign_keys is None else [foreign_keys] if isinstance(foreign_keys, ForeignKey) else foreign_keys
+        
         self.verify()
 
     def __repr__(self):
@@ -207,34 +204,46 @@ class PandaPack:
             df = SuperDataFrame(df=df, name=table_name)
             self.num_tables_wo_name+=1
         assert self.sdf.get(df.name) is None, f"Table {df.name} already exists."
-        self.sdf[df.name] = df
+        self.sdfs[df.name] = df
         
     def pop_sdf(self, table_name: str):
         """
         Removes a table with the given name.
         """
-        return self.sdf.pop(table_name,None)
+        return self.sdfs.pop(table_name,None)
     
     def get_sdf(self, sdf_name: str):
         """
         Returns a table with the given name.
         """
-        return self.sdf.get(sdf_name,None)
+        return self.sdfs.get(sdf_name,None)
+    
+    def update_sdf(self, sdf_name: str, df: Union[SuperDataFrame,pd.DataFrame]):
+        """
+        Updates a table with the given name.
+        """
+        assert self.get_sdf(sdf_name) is not None, f"Table {sdf_name} does not exist."
+        self.sdfs[sdf_name] = df
     
     def get_architecture(self):
         """
         Returns the architecture of SuperDataFrame in the form of a dictionary, that can be used in a query to the LLM.
         """
         arch = {}
-        for name,table in self.sdf.items():
-            arch[name] = table.get_architecture()
+        for name,sdf in self.sdfs.items():
+            arch[name] = sdf.get_architecture()
+            
+        if len(self.foreign_keys)>0:
+            arch['foreign_keys'] = []
+            for fk in self.foreign_keys:
+                arch['foreign_keys'].append(((fk.src_sdf,fk.src_column),(fk.tgt_sdf,fk.tgt_column)))
         return arch
     
     def get_sdf_names(self):
         """
         Returns a list of table names.
         """
-        return list(self.sdf.keys())
+        return list(self.sdfs.keys())
     
     def verify(self):
         pass
@@ -257,13 +266,8 @@ class PandaPack:
             assert tgt_column in self.get_sdf(tgt_sdf).columns, f"Column {tgt_column} does not exist in table {tgt_sdf}."
         
             fk = ForeignKey(src_sdf, src_column, tgt_sdf, tgt_column)
-        
-        sdf = self.get_sdf(fk.src_sdf)
             
-        if sdf.foreign_keys is None:
-            sdf.foreign_keys = [fk]
-        else:
-            sdf.foreign_keys.append(fk)
+        self.foreign_keys.append(fk)
         
     def set_summary(self, summary: str, force=False):
         """
