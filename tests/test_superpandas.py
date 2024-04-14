@@ -84,6 +84,35 @@ def test_to_and_from_disk(tmp_path):
     assert 'table_0' in loaded_pdp.sdfs
     assert loaded_pdp.get_sdf('table_0').equals(sdf)
     
+def test_equal_sdf():
+    df1 = sample_df()
+    df2 = sample_df()
+    sdf1 = SuperDataFrame(df1,name='Table1')
+    sdf2 = SuperDataFrame(df1,name='Table1')
+    sdf3 = SuperDataFrame(df1,name='Table2')
+    sdf3 = SuperDataFrame(df2,name='Table2')
+    assert sdf1 == sdf2
+    assert sdf1 != sdf3
+    assert not sdf2 == sdf3
+    
+def test_equal_pdp():
+    df = sample_df()
+    df = sample_df()
+    sdf1 = SuperDataFrame(df,name='Table1')
+    sdf2 = SuperDataFrame(df,name='Table2')
+    pdp1 = PandaPack(sdf=[sdf1, sdf2])
+    pdp2 = PandaPack(sdf=[sdf1, sdf2])
+    assert pdp1 == pdp2
+    
+def test_from_architecture():
+    sdf1 = SuperDataFrame(sample_df(),name='Table1')
+    sdf2 = SuperDataFrame(sample_df(),name='Table2')
+    pdp = PandaPack(sdf=[sdf1, sdf2])
+    pdp.add_foreign_key(src_sdf='Table1', src_column='A', tgt_sdf='Table2', tgt_column='B')
+    arch = pdp.get_architecture()
+    new_pdp = PandaPack.from_architecture(arch)
+    assert new_pdp.get_architecture() == pdp.get_architecture()
+    
 def test_openai_client():
     config = SuperPandasConfig(llm_type='openai')
     sdf1 = SuperDataFrame(sample_df(),name='Table1')

@@ -1,3 +1,4 @@
+import pdb
 import pandas as pd
 from dataclasses import dataclass
 from typing import List, Dict, Union, Optional, Any
@@ -103,6 +104,17 @@ class SuperDataFrame(pd.DataFrame):
     def _constructor(self):
         return SuperDataFrame
     
+    def __eq__(self, other: object) -> bool:
+        if type(other) is type(self):
+            if self.name!=other.name or self.descrption!=other.descrption:
+                return False
+            if not super().equals(other):
+                return False
+        return True
+    
+    def __ne__(self, other):
+        return not self.__eq__(other)
+    
     # def __repr__(self): #TODO: Fix this
     #     # df_repr = super().__repr__()
     #     pdb.set_trace()
@@ -187,11 +199,22 @@ class PandaPack:
     def __str__(self):
         return json.dumps(self.get_architecture(),indent=2)
     
-    def __eq__(self, __value: object) -> bool:
-        for table_name in self.sdf:
-            if not self.sdf[table_name].equals(__value.tables[table_name]):
+    def __eq__(self, other: object) -> bool:
+        for sdf in self.sdfs:
+            if not self.sdfs[sdf]==other.sdfs[sdf]:
+                return False
+        for fk in self.foreign_keys:
+            if fk not in other.foreign_keys:
+                return False
+            if (fk.src_sdf!=other.foreign_keys[fk].src_sdf or 
+                fk.src_column!=other.foreign_keys[fk].src_column or
+                fk.tgt_sdf!=other.foreign_keys[fk].tgt_sdf or
+                fk.tgt_column!=other.foreign_keys[fk].tgt_column):
                 return False
         return True
+    
+    def __ne__(self, other):
+        return not self.__eq__(other)
     
     def add_sdf(self, df: Union[SuperDataFrame,pd.DataFrame]):
         """
@@ -300,6 +323,31 @@ class PandaPack:
             cls = pickle.load(f)
             return cls
 
+    @classmethod
+    def from_architecture(cls, arch: Path): # TODO: add ingesting df values as well.
+        """
+        Initializes a PandaPack from a dictionary of architecture.
+        """
+        fks = []
+        sdfs = []
+        for key,value in arch.items():
+            # pdb.set_trace()
+            if 'foreign_keys' in key:
+                for val in value:
+                    ((src_sdf,src_column),(tgt_sdf,tgt_column)) = val
+                    fk = ForeignKey(src_sdf, src_column, tgt_sdf, tgt_column)
+                    fks.append(fk)
+            else:
+                name = key
+                descrption = value.get('descrption',None)
+                dtypes = {k:v for k,v in value.items() if k not in ['name','descrption']}
+                columns = list(dtypes.keys())
+                df = pd.DataFrame(columns=columns)
+                df = df.astype(dtypes)
+                sdf = SuperDataFrame(df,name=name,descrption=descrption)
+                sdfs.append(sdf)
+        return cls(sdf=sdfs,foreign_keys=fks)
+        
 @dataclass
 class SuperPandasConfig:
     """
