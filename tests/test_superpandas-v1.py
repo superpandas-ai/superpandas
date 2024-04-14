@@ -13,7 +13,7 @@ def sample_df():
     return pd.DataFrame(data)
 
 def test_super_dataframe_init_with_single_super_table():
-    sdf = SuperDataFrame(sample_df(),name='Table1')
+    sdf = SuperDataFrame(name='Table1', df=sample_df())
     pdp = PandaPack(sdf=sdf)
     assert len(pdp.sdfs) == 1
     assert 'Table1' in pdp.sdfs
@@ -25,8 +25,8 @@ def test_super_dataframe_init_with_single_pd_dataframe():
     assert 'table_0' in pdp.sdfs
 
 def test_super_dataframe_init_with_list_of_tables():
-    sdf1 = SuperDataFrame(sample_df(),name='Table1')
-    sdf2 = SuperDataFrame(sample_df(),name='Table2')
+    sdf1 = SuperDataFrame(name='Table1', df=sample_df())
+    sdf2 = SuperDataFrame(name='Table2', df=sample_df())
     pdp = PandaPack(sdf=[sdf1, sdf2])
     assert len(pdp.sdfs) == 2
     assert 'Table1' in pdp.sdfs
@@ -34,7 +34,7 @@ def test_super_dataframe_init_with_list_of_tables():
 
 def test_add_dataframe_without_name():
     pdp = PandaPack(sdf=sample_df())
-    new_sdf = SuperDataFrame(sample_df(),name='NewTable')
+    new_sdf = SuperDataFrame(name='NewTable', df=sample_df())
     pdp.add_sdf(new_sdf)
     assert len(pdp.sdfs) == 2
     assert 'table_0' in pdp.sdfs
@@ -49,22 +49,22 @@ def test_add_dataframe_with_name():
     assert 'table_1' in pdp.sdfs
 
 def test_get_table():
-    sdf = SuperDataFrame(sample_df(),name='table_0')
+    sdf = SuperDataFrame(name='table_0', df=sample_df())
     pdp = PandaPack(sdf=sdf)
     retrieved_sdf = pdp.get_sdf('table_0')
     assert retrieved_sdf.equals(sdf)
 
 def test_get_table_names():
-    sdf1 = SuperDataFrame(sample_df(),name='Table1')
-    sdf2 = SuperDataFrame(sample_df(),name='Table2')
-    pdp = PandaPack(sdf=[sdf1, sdf2])
-    names = pdp.get_sdf_names()
+    table1 = SuperDataFrame(name='Table1', df=sample_df())
+    table2 = SuperDataFrame(name='Table2', df=sample_df())
+    sdf = PandaPack(sdf=[table1, table2])
+    names = sdf.get_sdf_names()
     assert 'Table1' in names
     assert 'Table2' in names
 
 def test_add_foreign_key():
-    sdf1 = SuperDataFrame(sample_df(),name='Table1')
-    sdf2 = SuperDataFrame(sample_df(),name='Table2')
+    sdf1 = SuperDataFrame(name='Table1', df=sample_df())
+    sdf2 = SuperDataFrame(name='Table2', df=sample_df())
     pdp = PandaPack(sdf=[sdf1, sdf2])
     pdp.add_foreign_key(src_sdf='Table1', src_column='A', tgt_sdf='Table2', tgt_column='B')
     assert len(pdp.foreign_keys) == 1
@@ -73,7 +73,7 @@ def test_add_foreign_key():
     assert len(pdp.foreign_keys) == 2
 
 def test_to_and_from_disk(tmp_path):
-    sdf = SuperDataFrame(sample_df(),name='table_0')
+    sdf = SuperDataFrame(name='table_0', df=sample_df())
     pdp = PandaPack(sdf=sdf)
     file_path = tmp_path / "test_sdf.pkl"
     pdp.to_disk(file_path)
@@ -86,8 +86,8 @@ def test_to_and_from_disk(tmp_path):
     
 def test_openai_client():
     config = SuperPandasConfig(llm_type='openai')
-    sdf1 = SuperDataFrame(sample_df(),name='Table1')
-    sdf2 = SuperDataFrame(sample_df(),name='Table2')
+    sdf1 = SuperDataFrame(name='Table1', df=sample_df())
+    sdf2 = SuperDataFrame(name='Table2', df=sample_df())
     pdp = PandaPack(sdf=[sdf1, sdf2])
     pdp.add_foreign_key(src_sdf='Table1', src_column='A', tgt_sdf='Table2', tgt_column='B')
     spd = SuperPandas(pdp=pdp, config=config)
@@ -103,8 +103,8 @@ def test_openai_client():
 
 def test_tgi_client():
     config = SuperPandasConfig(llm_type='tgi')
-    sdf1 = SuperDataFrame(sample_df(),name='Table1')
-    sdf2 = SuperDataFrame(sample_df(),name='Table2')
+    sdf1 = SuperDataFrame(name='Table1', df=sample_df())
+    sdf2 = SuperDataFrame(name='Table2', df=sample_df())
     pdp = PandaPack(sdf=[sdf1, sdf2])
     pdp.add_foreign_key(src_sdf='Table1', src_column='A', tgt_sdf='Table2', tgt_column='B')
     spd = SuperPandas(pdp=pdp, config=config)
@@ -119,7 +119,7 @@ def test_tgi_client():
     
 def test_tgi_client_table_description():
     config = SuperPandasConfig(llm_type='tgi')
-    sdf = SuperDataFrame(sample_df(),name='Table1')
+    sdf = SuperDataFrame(name='Table1', df=sample_df())
     pdp = PandaPack(sdf=sdf)
     spd = SuperPandas(pdp=pdp, config=config)
     response = spd.get_sdf_description_from_llm('Table1')

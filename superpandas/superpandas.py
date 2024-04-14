@@ -1,6 +1,4 @@
-import pdb
 import pandas as pd
-import numpy as np
 from dataclasses import dataclass
 from typing import List, Dict, Union, Optional, Any
 from pathlib import Path
@@ -21,23 +19,23 @@ class ForeignKey:
     tgt_column: str
      
 @dataclass
-class SuperDataFrame:
+class SuperDataFrameV1:
     """
     Creates a SuperDataFrame object which is a wrapper around a Pandas DataFrame. It adds following metadata to the DataFrame:
     - name: name of the table
-    - desc: description of the table
+    - descrption: description of the table
     Addtionally it adds dataframe column names and dtypes.
     """
     df: pd.DataFrame
     name: Optional[str] = None
-    desc: Optional[str] = None
+    descrption: Optional[str] = None
     
     def __post_init__(self):
         self.columns = list(self.df.columns)
         self.dtypes = {k:str(v) for k,v in self.df.dtypes.items()}
         
     def __eq__(self, __value: object) -> bool:
-        return self.df.equals(__value.table)
+        return self.df.equals(__value.df)
     
     def equals(self, __value: object) -> bool:
         return self.df.equals(__value.df)
@@ -46,7 +44,10 @@ class SuperDataFrame:
         """
         Returns the architecture of SuperDataFrame
         """
-        arch = self.dtypes
+        arch = {'name':self.name,
+                'descrption':self.descrption}
+        arch.update(self.dtypes)
+        
         return arch
     
     def to_disk(self, path: Path):
@@ -69,27 +70,33 @@ class SuperDataFrame:
         """
         Sets the description of the SuperDataFrame if not already set. If force is True, it replaces the existing description.
         """
-        if self.desc is not None and not force:
+        if self.descrption is not None and not force:
             raise ValueError("SuperDataFrame already has a description. Use `force=True` to replace it.")
-        self.desc = text
+        self.descrption = text
 
-class SuperDataFrameV2(pd.DataFrame):
+class SuperDataFrame(pd.DataFrame):
     """
-    Creates a SuperDataFrame object which is a wrapper around a Pandas DataFrame. It adds following optional metadata to the DataFrame:
+    Creates a SuperDataFrame object which is a subclass of Pandas DataFrame. It adds following optional metadata to the DataFrame:
     - name: name of the table
-    - desc: description of the table
-    - foreign_keys: list of foreign keys
-    Addtionally it adds dataframe column names and dtypes.
+    - descrption: description of the table
+
+    Additionally it introduces following methods:
+    - get_architecture: Returns the architecture of SuperDataFrame
+    - to_disk: Saves the SuperDataFrame to disk
+    - from_disk: Loads the SuperDataFrame from disk
+    - set_description: Sets the description of the SuperDataFrame if not already set. If force=True is passed, it replaces the existing description.
     """
     
-    _metadata = ["name", "desc", "foreign_keys"]
+    _metadata = ["name", "descrption"]
+
+    name=None
+    descrption=None
     
     def __init__(self,
                  *args, **kwargs,
                  ) -> None:
         self.name = kwargs.pop('name',None)
-        self.desc = kwargs.pop('desc',None)
-        self.foreign_keys = kwargs.get('foreign_keys',None)        
+        self.descrption = kwargs.pop('descrption',None)     
         super().__init__(*args, **kwargs,)
 
     @property
@@ -101,32 +108,21 @@ class SuperDataFrameV2(pd.DataFrame):
     #     pdb.set_trace()
     #     return {self.name: repr(super())}
     
-    # def __str__(self):
-    #     # str_ = f"SuperDataFrame:\nname: {self.name}\ndescription: {self.desc}\n"+super().__str__()
-    #     return super().__str__()
-
-    def __setattr__(self, attr, val): # https://github.com/geopandas/geopandas/blob/514f975298b940fca1a39917ff35aa12b149a1e7/geopandas/geodataframe.py#L198C1-L203C43
-        # have to special case b/c pandas tries to use as column...
-        if attr in ["name","desc","foreign_keys"]:
-            object.__setattr__(self, attr, val)
-        else:
-            super().__setattr__(attr, val)
+    # def __str__(self): #TODO: complete it
             
     def get_architecture(self):
         """
         Returns the architecture of SuperDataFrame
         """
-        arch = self.dtypes
-        if self.foreign_keys is not None:
-            arch['foreign_keys'] = {}
-            for fk in self.foreign_keys:
-                arch['foreign_keys'][fk.src_column] = (fk.tgt_sdf,fk.tgt_column)
+        arch = {'name':self.name,
+                'descrption':self.descrption}
+        arch.update(self.dtypes)
         
         return arch
-    
+        
     def to_disk(self, path: Path):
         """
-        Saves the SuperDataFrame to disk.
+        Pickles the SuperDataFrame to disk.
         """
         with open(path, 'wb') as f:
             pickle.dump(self, f)
@@ -144,10 +140,10 @@ class SuperDataFrameV2(pd.DataFrame):
         """
         Sets the description of the SuperDataFrame if not already set. If force is True, it replaces the existing description.
         """
-        if self.desc is not None and not force:
+        if self.descrption!="" and not force:
             raise ValueError("SuperDataFrame already has a description. Use `force=True` to replace it.")
-        self.desc = text
-        
+        self.descrption = text
+                
 class PandaPack:
     """
     Creates a PandaPack object which is a collection of SuperDataFrames and optional foreign keys to connect them.
@@ -167,21 +163,23 @@ class PandaPack:
         elif isinstance(sdf, SuperDataFrame):
             self.sdf = [sdf]
         elif isinstance(sdf, pd.DataFrame):
-            self.sdf = [SuperDataFrame(df=sdf)]
+            self.sdf = [SuperDataFrame(sdf)]
         elif sdf==None:
             self.sdf = {}
         else:
             raise ValueError(f"tables must be a SuperDataFrame, pd.DataFrame, or a list of SuperDataFrames/pd.DataFrames. Received {type(sdf)}")
         
+        # In case of pd.DataFrames, assign names to them consecutively
         self.num_tables_wo_name = len([table for table in self.sdf if table.name==None])
         for i in range(self.num_tables_wo_name):
             if self.sdf[i].name is None:
                 self.sdf[i].name = f"table_{i}"
+                
         self.sdfs = {table.name: table for table in self.sdf}
         self.summary = summary
         self.foreign_keys= [] if foreign_keys is None else [foreign_keys] if isinstance(foreign_keys, ForeignKey) else foreign_keys
         
-        self.verify()
+        self.verify() #TODO: Implement this
 
     def __repr__(self):
         return str(self.get_architecture())
@@ -199,12 +197,15 @@ class PandaPack:
         """
         Adds a pd.DataFrame/SuperDataFrame to PandaPack.
         """
-        if isinstance(df, pd.DataFrame):
+        if isinstance(df, SuperDataFrame):
+            assert self.sdfs.get(df.name) is None, f"DataFrame {df.name} already exists."
+            self.sdfs[df.name] = df
+        else: # pd.DataFrame
             table_name = f"table_{self.num_tables_wo_name}"
-            df = SuperDataFrame(df=df, name=table_name)
+            df = SuperDataFrame(df, name=table_name)
             self.num_tables_wo_name+=1
-        assert self.sdf.get(df.name) is None, f"Table {df.name} already exists."
-        self.sdfs[df.name] = df
+            assert self.sdfs.get(df.name) is None, f"DataFrame {df.name} already exists."
+            self.sdfs[df.name] = df
         
     def pop_sdf(self, table_name: str):
         """
