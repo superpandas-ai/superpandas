@@ -13,7 +13,7 @@ To install SuperPandas, you can either use pip:
 or clone the repository and install it manually:
 
 ```
-    git clone https://github.com/MaveriQ/superpandas.git
+    git clone https://github.com/superpandas-dev/superpandas.git
     cd superpandas
     pip install .
 ```
@@ -23,7 +23,7 @@ SuperPandas adds a few new concepts to Pandas DataFrame to make it more amenable
 ![diagram](architecture.png)
 
 ### SuperDataFrame (SDF):
-A SuperDataFrame is ~~a subclass of Pandas' DataFrame~~(not yet. In works. Presently it's a composition). It is a container for data, and has all the functionality of a Pandas DataFrame, plus some additional attributes and methods that allow it to be used with SuperPandas' natural language interface. The additional attributes are :
+A SuperDataFrame is a subclass of Pandas' DataFrame ~~(not yet. In works. Presently it's a composition)~~. It is a container for data, and has all the functionality of a Pandas DataFrame, plus some additional attributes and methods that allow it to be used with SuperPandas' natural language interface. The additional attributes are :
 -   DataFrame `name` and `description` : They are used in the prompts to LLMClient. They can be manually set by the user or obtained by the LLMClient.
 -   DataFrame column names and datatypes : They are also used in the prompts to LLMClient and are extracted from the underlying DataFrame. 
 
@@ -42,9 +42,11 @@ LLMClient is a class that is used to interface with a Large (or Small) Language 
 It is an extensible configuration class that is used to store the configuration of the SuperPandas library. Presently it has configuration for the LLMClient.
 
 ### SuperPandas
-This is the main class that the user interacts with to use SuperPandas. It is initialized with a PandaPack and a SuperPandasConfig to setup the LLMClient. It has various methods to query the LLM using the PromptTemplates and to get the results of the queries.
+This is the main class that the user interacts with, to use SuperPandas. It is initialized with a PandaPack and a SuperPandasConfig to setup the LLMClient. It has various methods to query the LLM using the PromptTemplates and to get the results of the queries.
 
 ### PromptTemplates
+
+- TBD
 
 ## Usage
 The project offers both a webapp and a Python API. The webapp can be accessed [here](https://superpandas.streamlit.app/). The Python library can be used as follows:
@@ -55,10 +57,10 @@ import pandas as pd
 
 df1=pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})
 df2=pd.DataFrame({'c': [7, 8, 9], 'd': [10,11,12]})
-sdf1 = spd.SuperDataFrame(df=df1,name='Table1')
-sdf2 = spd.SuperDataFrame(df=df2,name='Table2')
+sdf1 = spd.SuperDataFrame(df1,name='Table1')
+sdf2 = spd.SuperDataFrame(df2,name='Table2')
 pdp = PandaPack(sdf=[sdf1, sdf2])
-pdp.add_foreign_key('Table1', 'b', 'Table2', 'd')
+pdp.add_foreign_key('Table1', 'b', 'Table2', 'd') # Column b in Table1 is a foreign key to column d in Table2
 
 config = spd.SuperPandasConfig(llm_type='tgi')
 spd = SuperPandas(pdp=pdp, config=config)
@@ -76,4 +78,17 @@ result = spd.query_llm('What is the average of column a in Table1?')
 
 ## Documentation
 The documentation for SuperPandas can be found [here](https://superpandas.readthedocs.io/en/latest/).
+
+## Roadmap/TODOs
+
+### Technical
+- [ ] Improve Prompt Templates
+- [ ] Launch Fine-tuned LLM
+- [ ] Streamlit Webapp
+- [ ] Add support for more inference engines
+- [ ] Add support for Matplotlib
+- [ ] Add support for Scikit-learn
+
+### Non-Technical
+- [ ] Feedback mechanism
 
