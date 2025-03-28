@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from superpandas import SuperDataFrame, create_super_dataframe
 import json
+import os
 
 class TestSuperDataFrameBasics:
     """Test basic SuperDataFrame functionality"""
@@ -246,4 +247,94 @@ class TestDataFrameOperations:
         
         assert isinstance(result, SuperDataFrame)
         # Should inherit metadata from left dataframe
-        assert result.name == "Test DataFrame" 
+        assert result.name == "Test DataFrame"
+
+class TestSuperDataFrameIO:
+    """Test SuperDataFrame I/O methods"""
+    
+    def test_read_csv(self, titanic_csv_path):
+        """Test SuperDataFrame.read_csv"""
+        # Basic read
+        df = SuperDataFrame.read_csv(titanic_csv_path)
+        assert isinstance(df, SuperDataFrame)
+        
+        # Create test CSV with metadata
+        df = SuperDataFrame(
+            pd.read_csv(titanic_csv_path),
+            name="Titanic Dataset",
+            description="Passenger data from the Titanic",
+            column_descriptions={
+                'Survived': 'Whether the passenger survived (1) or not (0)'
+            }
+        )
+        
+        # Save with metadata
+        test_path = os.path.join(os.path.dirname(titanic_csv_path), "test_titanic.csv")
+        df.to_csv(test_path, include_metadata=True)
+        
+        # Read back and verify metadata preserved
+        loaded_df = SuperDataFrame.read_csv(test_path, load_metadata=True)
+        assert loaded_df.name == "Titanic Dataset"
+        assert loaded_df.description == "Passenger data from the Titanic"
+        assert loaded_df.get_column_description('Survived') == 'Whether the passenger survived (1) or not (0)'
+        
+        # Test pandas options still work
+        df = SuperDataFrame.read_csv(titanic_csv_path, usecols=['PassengerId', 'Survived', 'Name'])
+        assert list(df.columns) == ['PassengerId', 'Survived', 'Name']
+        
+        # Cleanup
+        if os.path.exists(test_path):
+            os.remove(test_path)
+            os.remove(test_path.replace('.csv', '_metadata.json'))
+    
+    def test_read_json(self, tmp_path):
+        """Test SuperDataFrame read_json and to_json"""
+        # Create test data
+        original_df = SuperDataFrame(
+            {'A': [1, 2, 3], 'B': ['x', 'y', 'z']},
+            name="JSON Test",
+            description="Test JSON file",
+            column_descriptions={'A': 'Numbers', 'B': 'Letters'}
+        )
+        
+        # Save to JSON
+        json_path = os.path.join(tmp_path, "test.json")
+        original_df.to_json(json_path)
+        
+        # Read it back
+        loaded_df = SuperDataFrame.read_json(json_path)
+        
+        # Verify data and metadata
+        assert isinstance(loaded_df, SuperDataFrame)
+        assert loaded_df.name == "JSON Test"
+        assert loaded_df.description == "Test JSON file"
+        assert loaded_df.get_column_description('A') == 'Numbers'
+        assert loaded_df.get_column_description('B') == 'Letters'
+        assert list(loaded_df.columns) == ['A', 'B']
+        pd.testing.assert_frame_equal(pd.DataFrame(original_df), pd.DataFrame(loaded_df))
+    
+    def test_read_pickle(self, tmp_path):
+        """Test SuperDataFrame read_pickle and to_pickle"""
+        # Create test data
+        original_df = SuperDataFrame(
+            {'A': [1, 2, 3], 'B': ['x', 'y', 'z']},
+            name="Pickle Test",
+            description="Test Pickle file",
+            column_descriptions={'A': 'Numbers', 'B': 'Letters'}
+        )
+        
+        # Save to pickle
+        pickle_path = os.path.join(tmp_path, "test.pkl")
+        original_df.to_pickle(pickle_path)
+        
+        # Read it back
+        loaded_df = SuperDataFrame.read_pickle(pickle_path)
+        
+        # Verify data and metadata
+        assert isinstance(loaded_df, SuperDataFrame)
+        assert loaded_df.name == "Pickle Test"
+        assert loaded_df.description == "Test Pickle file"
+        assert loaded_df.get_column_description('A') == 'Numbers'
+        assert loaded_df.get_column_description('B') == 'Letters'
+        assert list(loaded_df.columns) == ['A', 'B']
+        pd.testing.assert_frame_equal(pd.DataFrame(original_df), pd.DataFrame(loaded_df)) 

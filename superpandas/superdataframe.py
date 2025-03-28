@@ -1,3 +1,4 @@
+import pdb
 import pandas as pd
 import json
 import numpy as np
@@ -566,8 +567,9 @@ Columns:
                 with open(metadata_path, 'r', encoding='utf-8') as f:
                     metadata = json.load(f)
             except FileNotFoundError:
+                print(f"Metadata file not found at {metadata_path}")
                 pass
-        
+
         # Create SuperDataFrame with metadata if available
         result = cls(
             df,

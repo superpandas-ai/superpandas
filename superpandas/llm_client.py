@@ -210,13 +210,35 @@ Provide a clear and concise response based on the data shown above.
             # Fallback if response isn't properly formatted
             return {col: "No description available" for col in sdf.columns}
 
+    def generate_df_name(self, sdf: SuperDataFrame) -> str:
+        """
+        Generate a concise name for the DataFrame based on its contents.
+        
+        Args:
+            sdf: SuperDataFrame to name
+            
+        Returns:
+            str: Generated name for the DataFrame
+        """
+        prompt = f"""
+        Given the following DataFrame information, generate a concise, descriptive name for it:
+        
+        {sdf.schema()}
+        
+        Please provide a short, clear name (1-5 words) that captures the essence of this dataset.
+        The name should be in snake_case format (lowercase with underscores).
+        Response should only contain the name, nothing else.
+        """
+        
+        return self.query(prompt).strip()
+
 def auto_describe_dataframe(
     df: pd.DataFrame,
     model: Optional[Union[str, Model]] = None,
     provider_class: Optional[Type[Model]] = None,
+    generate_df_name: bool = True,
     generate_df_description: bool = True,
     generate_column_descriptions: bool = True,
-    _is_auto_describing: bool = False,
     **model_kwargs
 ) -> SuperDataFrame:
     """
@@ -226,9 +248,9 @@ def auto_describe_dataframe(
         df: Input DataFrame
         model: Model name or instance of Model class
         provider_class: Class to use for model provider (LiteLLMModel, OpenAIServerModel, HfApiModel, etc.)
+        generate_df_name: Whether to generate DataFrame name
         generate_df_description: Whether to generate overall DataFrame description
         generate_column_descriptions: Whether to generate column descriptions
-        _is_auto_describing: Internal flag to indicate auto-describing process
         **model_kwargs: Additional arguments to pass to the model provider
     
     Returns:
@@ -236,14 +258,19 @@ def auto_describe_dataframe(
     """
     llm_client = LLMClient(model=model, provider_class=provider_class, **model_kwargs)
     
+    df_name = ""
     df_description = ""
     column_descriptions = {}
     
     # Convert to SuperDataFrame first if needed
     if not isinstance(df, SuperDataFrame):
-        sdf = SuperDataFrame.from_pandas(df, _is_auto_describing=True)
+        sdf = SuperDataFrame.from_pandas(df)
     else:
         sdf = df
+    
+    if generate_df_name:
+        df_name = llm_client.generate_df_name(sdf)
+        sdf.name = df_name
     
     if generate_df_description:
         df_description = llm_client.generate_df_description(sdf)
