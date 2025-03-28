@@ -3,6 +3,8 @@ from superpandas import (
     SuperDataFrame, auto_describe_dataframe, 
     LLMClient, DummyLLMClient
 )
+from unittest.mock import Mock, patch
+from smolagents import Model
 
 class TestLLMIntegration:
     """Test LLM integration functionality"""
@@ -111,4 +113,107 @@ class TestLLMIntegration:
         # Test analyze_dataframe
         analysis = client.analyze_dataframe(sdf, "Describe the trends")
         assert isinstance(analysis, str)
-        assert "This is a dummy response" in analysis 
+        assert "This is a dummy response" in analysis
+
+    def test_available_providers(self):
+        """Test getting available LLM providers"""
+        providers = LLMClient.available_providers()
+        assert isinstance(providers, dict)
+        # Check some common providers that should be available
+        expected_providers = ['LiteLLMModel', 'OpenAIServerModel', 'HfApiModel']
+        for provider in expected_providers:
+            if provider in providers:
+                assert issubclass(providers[provider], Model)
+
+    def test_query_with_different_inputs(self):
+        """Test query method with different input types"""
+        client = DummyLLMClient()
+
+        # Test with simple string
+        response = client.query("Simple query")
+        assert isinstance(response, str)
+
+        # Test with multi-line string
+        response = client.query("""
+        Multi-line
+        query
+        text
+        """)
+        assert isinstance(response, str)
+
+        # Test with empty string
+        response = client.query("")
+        assert isinstance(response, str)
+
+    def test_analyze_dataframe_scenarios(self, sample_super_df):
+        """Test analyze_dataframe with different scenarios"""
+        client = DummyLLMClient()
+
+        # Test with empty dataframe
+        empty_df = SuperDataFrame()
+        response = client.analyze_dataframe(empty_df, "Analyze empty")
+        assert isinstance(response, str)
+
+        # Test with single column dataframe
+        single_col_df = SuperDataFrame({'A': [1, 2, 3]})
+        response = client.analyze_dataframe(single_col_df, "Analyze single column")
+        assert isinstance(response, str)
+
+        # Test with complex query
+        response = client.analyze_dataframe(
+            sample_super_df,
+            "Perform detailed statistical analysis with correlations"
+        )
+        assert isinstance(response, str)
+
+    def test_generate_df_name_scenarios(self, sample_super_df):
+        """Test generate_df_name with different scenarios"""
+        client = DummyLLMClient()
+
+        # Test with empty dataframe
+        empty_df = SuperDataFrame()
+        name = client.generate_df_name(empty_df)
+        assert isinstance(name, str)
+
+        # Test with single column dataframe
+        single_col_df = SuperDataFrame({'values': [1, 2, 3]})
+        name = client.generate_df_name(single_col_df)
+        assert isinstance(name, str)
+
+        # Test with dataframe that already has a name
+        name = client.generate_df_name(sample_super_df)
+        assert isinstance(name, str)
+
+    def test_llm_client_with_kwargs(self):
+        """Test LLMClient initialization with various kwargs"""
+        # Test with temperature
+        client = LLMClient(model=None, temperature=0.7)
+        assert hasattr(client, 'model')
+
+        # Test with max_tokens
+        client = LLMClient(model=None, max_tokens=100)
+        assert hasattr(client, 'model')
+
+        # Test with multiple kwargs
+        client = LLMClient(
+            model=None,
+            temperature=0.7,
+            max_tokens=100,
+            top_p=0.9,
+            frequency_penalty=0.1
+        )
+        assert hasattr(client, 'model')
+
+    def test_model_validation(self):
+        """Test model validation during initialization"""
+        # Test with invalid model string but valid provider
+        mock_provider = Mock(spec=type)
+        mock_provider.side_effect = ValueError("Invalid model")
+        
+        client = LLMClient(model="invalid_model", provider_class=mock_provider)
+        assert client.model is not None  # Should fall back to default model
+
+        # Test with both invalid model and provider
+        with patch.object(LLMClient, 'DEFAULT_LLM', None):
+            client = LLMClient(model="invalid_model", provider_class=mock_provider)
+            assert client.model is None 
