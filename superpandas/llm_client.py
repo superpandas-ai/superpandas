@@ -56,8 +56,23 @@ class LLMClient:
     """
     
     # Default to using HfApiModel with Llama 3.2
-    DEFAULT_PROVIDER = providers.get('HfApiModel', lambda x: None)("meta-llama/Llama-3.2-3B-Instruct")
+    DEFAULT_LLM = providers.get('HfApiModel', lambda x: None)("meta-llama/Llama-3.2-3B-Instruct")
     
+    @staticmethod
+    def available_providers() -> Dict[str, Type[Model]]:
+        """
+        Get a dictionary of all available LLM providers.
+        
+        Returns:
+            Dict[str, Type[Model]]: Dictionary mapping provider names to their corresponding classes
+        
+        Example:
+            >>> providers = LLMClient.available_providers()
+            >>> print(providers.keys())  # Shows all available provider names
+            >>> my_client = LLMClient(provider_class=providers['OpenAIServerModel'])
+        """
+        return providers
+
     def __init__(self, 
                  model: Optional[Union[str, Model]] = None,
                  provider_class: Optional[Type[Model]] = None,
@@ -82,23 +97,23 @@ class LLMClient:
             try:
                 self.model = provider_class(model, **model_kwargs)
                 # Validate HfApiModel endpoint exists
-                if provider_class == HfApiModel:
-                    try:
-                        self.model.client.get_endpoint_info()
-                    except HfHubHTTPError as e:
-                        raise ValueError(f"Model {model} not found on Hugging Face Hub: {str(e)}")
+                # if provider_class == HfApiModel:
+                #     try:
+                #         self.model.client.get_endpoint_info()
+                #     except HfHubHTTPError as e:
+                #         raise ValueError(f"Model {model} not found on Hugging Face Hub: {str(e)}")
             except Exception as e:
                 print(f"Error {e} initializing model: {model} with provider {provider_class}")
-                if self.DEFAULT_PROVIDER:
-                    print(f"Using default provider: {self.DEFAULT_PROVIDER}")
-                    self.model = self.DEFAULT_PROVIDER
+                if self.DEFAULT_LLM:
+                    print(f"Using default provider: {self.DEFAULT_LLM}")
+                    self.model = self.DEFAULT_LLM
                 else:
                     print("No default provider available. Please install smolagents with the desired provider.")
                     self.model = None
         else:
-            if self.DEFAULT_PROVIDER:
-                print(f"Using default provider: {self.DEFAULT_PROVIDER}")
-                self.model = self.DEFAULT_PROVIDER
+            if self.DEFAULT_LLM:
+                print(f"Using default provider: {str(self.DEFAULT_LLM)}")
+                self.model = self.DEFAULT_LLM
             else:
                 print("No default provider available. Please install smolagents with the desired provider.")
                 self.model = None

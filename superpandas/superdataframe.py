@@ -235,8 +235,8 @@ Columns:
                         } for col in self.columns
                     }
                 },
-                # Convert to records and handle datetime objects
-                "data": json.loads(sample_df.reset_index(drop=True).to_json(orient='records', date_format='iso'))
+                # Convert to records using pandas to_json
+                "data": json.loads(pd.DataFrame(sample_df).reset_index(drop=True).to_json(orient='records', date_format='iso'))
             }
             return json.dumps(result, indent=2)
             
@@ -276,7 +276,7 @@ Columns:
             return text
             
         else:
-            raise ValueError(f"Unsupported format type: {format_type}")
+            raise ValueError(f"Unsupported format type: {format_type}.")
 
     @classmethod
     def from_pandas(
@@ -394,6 +394,196 @@ Columns:
                 
         return result
     
+    def to_pickle(self, path: str):
+        """
+        Save the SuperDataFrame to a pickle file, preserving all metadata.
+        
+        Parameters:
+        -----------
+        path : str
+            Path where the pickle file will be saved
+        """
+        data = {
+            'dataframe': pd.DataFrame(self),  # Convert to regular pandas DataFrame
+            'metadata': {
+                'name': self._df_name,
+                'description': self._df_description,
+                'column_descriptions': self._column_descriptions,
+                'column_types': self._column_types
+            }
+        }
+        pd.to_pickle(data, path)
+
+    @classmethod
+    def read_pickle(cls, path: str) -> 'SuperDataFrame':
+        """
+        Read a SuperDataFrame from a pickle file.
+        
+        Parameters:
+        -----------
+        path : str
+            Path to the pickle file
+        
+        Returns:
+        --------
+        SuperDataFrame
+            The loaded SuperDataFrame with all metadata
+        """
+        data = pd.read_pickle(path)
+        
+        # Create SuperDataFrame from the stored data
+        df = cls(
+            data['dataframe'],
+            name=data['metadata']['name'],
+            description=data['metadata']['description'],
+            column_descriptions=data['metadata']['column_descriptions']
+        )
+        
+        # Restore column types
+        df._column_types = data['metadata']['column_types']
+        
+        return df
+
+    def to_json(self, path: str):
+        """
+        Save the SuperDataFrame to JSON format, preserving all metadata.
+        
+        Parameters:
+        -----------
+        path : str
+            Path where the JSON file will be saved
+        """
+        # Convert DataFrame to records with date handling
+        records = self.copy()
+        for col in records.select_dtypes(include=['datetime64[ns]']).columns:
+            records[col] = records[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        data = {
+            'dataframe': records.to_dict(orient='records'),
+            'metadata': {
+                'name': self._df_name,
+                'description': self._df_description,
+                'column_descriptions': self._column_descriptions,
+                'column_types': self._column_types,
+                'dtypes': {col: str(dtype) for col, dtype in self.dtypes.items()}
+            }
+        }
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+
+    @classmethod
+    def read_json(cls, path: str) -> 'SuperDataFrame':
+        """
+        Read a SuperDataFrame from a JSON file.
+        
+        Parameters:
+        -----------
+        path : str
+            Path to the JSON file
+        
+        Returns:
+        --------
+        SuperDataFrame
+            The loaded SuperDataFrame with all metadata
+        """
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # Create DataFrame from the stored records
+        df = pd.DataFrame(data['dataframe'])
+        
+        # Convert to SuperDataFrame with metadata
+        result = cls(
+            df,
+            name=data['metadata']['name'],
+            description=data['metadata']['description'],
+            column_descriptions=data['metadata']['column_descriptions']
+        )
+        
+        # Restore column types
+        result._column_types = data['metadata']['column_types']
+        
+        return result
+
+    def to_csv(self, path: str, include_metadata: bool = True, **kwargs):
+        """
+        Save the SuperDataFrame to CSV format with optional metadata.
+        
+        Parameters:
+        -----------
+        path : str
+            Path where the CSV file will be saved
+        include_metadata : bool, default True
+            If True, saves an additional JSON file with metadata
+        **kwargs : dict
+            Additional arguments passed to pandas to_csv method
+        """
+        # Save the data as CSV
+        super().to_csv(path, **kwargs)
+        
+        # If requested, save metadata separately
+        if include_metadata:
+            path_str = str(path)  # Convert Path object to string
+            metadata_path = path_str.rsplit('.', 1)[0] + '_metadata.json'
+            metadata = {
+                'name': self._df_name,
+                'description': self._df_description,
+                'column_descriptions': self._column_descriptions,
+                'column_types': self._column_types,
+                'dtypes': {col: str(dtype) for col, dtype in self.dtypes.items()}
+            }
+            with open(metadata_path, 'w', encoding='utf-8') as f:
+                json.dump(metadata, f, indent=2)
+
+    @classmethod
+    def read_csv(cls, path: str, load_metadata: bool = True, **kwargs) -> 'SuperDataFrame':
+        """
+        Read a SuperDataFrame from a CSV file with optional metadata.
+        
+        Parameters:
+        -----------
+        path : str
+            Path to the CSV file
+        load_metadata : bool, default True
+            If True, loads metadata from the companion JSON file if it exists
+        **kwargs : dict
+            Additional arguments passed to pandas read_csv method
+        
+        Returns:
+        --------
+        SuperDataFrame
+            The loaded SuperDataFrame with metadata if available
+        """
+        # Read the CSV data
+        df = pd.read_csv(path, **kwargs)
+        
+        metadata = {}
+        if load_metadata:
+            # Convert path to string and handle metadata path
+            path_str = str(path)
+            metadata_path = path_str.rsplit('.', 1)[0] + '_metadata.json'
+            try:
+                with open(metadata_path, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+            except FileNotFoundError:
+                pass
+        
+        # Create SuperDataFrame with metadata if available
+        result = cls(
+            df,
+            name=metadata.get('name', ''),
+            description=metadata.get('description', ''),
+            column_descriptions=metadata.get('column_descriptions', {})
+        )
+        
+        # Restore column types if available
+        if 'column_types' in metadata:
+            result._column_types = metadata['column_types']
+        else:
+            result._infer_column_types()
+        
+        return result
+
 # Helper function to create a SuperDataFrame
 def create_super_dataframe(*args, **kwargs) -> SuperDataFrame:
     """
