@@ -93,6 +93,9 @@ class LLMClient:
             model = model or config.llm_model
             provider_class = provider_class or config.llm_provider_class
             model_kwargs = {**config.llm_kwargs, **model_kwargs}
+
+            # Remove existing_values from model_kwargs
+            model_kwargs.pop('existing_values', None)
             
             if model is None and provider_class is None:
                 provider_class = providers.get('HfApiModel')
