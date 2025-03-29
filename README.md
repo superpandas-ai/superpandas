@@ -1,6 +1,6 @@
 # SuperPandas
 
-SuperPandas is a Python package that extends pandas DataFrame functionality with rich metadata to allow for AI-powered analysis and documentation on your Pandas DataFrames.
+SuperPandas is a Python package that extends pandas DataFrame functionality with rich metadata to allow for AI-powered analysis on your Pandas DataFrames.
 
 ## Installation
 
