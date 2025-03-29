@@ -195,7 +195,7 @@ Columns:
         if format_type == 'json':
             # Create a dictionary with metadata and data
             result = {
-                
+                    'metadata' : {
                     "name": self.name,
                     "description": self.description,
                     "shape": self._obj.shape,
@@ -207,6 +207,7 @@ Columns:
                         } for col in self._obj.columns
                     }
                 }
+            }
             
             if max_rows > 0:
                 result["data"] = json.loads(pd.DataFrame(sample_df).reset_index(drop=True).to_json(orient='records', date_format='iso'))
@@ -467,7 +468,6 @@ def read_csv(path: str, require_metadata: bool = True, **kwargs) -> pd.DataFrame
         If False, initializes empty metadata when metadata file is not found
     **kwargs : dict
         Additional arguments passed to pandas read_csv method
-    
     Returns:
     --------
     pd.DataFrame
@@ -490,17 +490,29 @@ def read_csv(path: str, require_metadata: bool = True, **kwargs) -> pd.DataFrame
     >>> # Pass pandas read_csv arguments
     >>> df = spd.read_csv('data.csv', index_col=0, parse_dates=['date_column'])
     """
-    # Read the CSV data
-    df = pd.read_csv(path, **kwargs)
-    
     # Try to read metadata
     path_str = str(path)
     metadata_path = path_str.rsplit('.', 1)[0] + '_metadata.json'
+
+    try:
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+            # Add parse_dates for datetime columns based on metadata
+            if 'dtypes' in metadata:
+                date_columns = [col for col, dtype in metadata['dtypes'].items() 
+                              if 'datetime' in dtype.lower()]
+                if date_columns:
+                    kwargs.setdefault('parse_dates', date_columns)
+    except FileNotFoundError:
+        if require_metadata:
+            raise FileNotFoundError(f"Metadata file not found: {metadata_path}")
+    
+    # Read the CSV data
+    df = pd.read_csv(path, **kwargs)
     
     try:
         with open(metadata_path, 'r', encoding='utf-8') as f:
             metadata = json.load(f)
-            # pdb.set_trace()
             df.attrs['super'] = {
                 'name': metadata.get('name', ''),
                 'description': metadata.get('description', ''),

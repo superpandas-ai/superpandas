@@ -68,15 +68,11 @@ class TestSerialization:
         metadata_path = temp_dir / 'test_metadata.json'
         assert metadata_path.exists()
         
-        # Load from CSV using standalone read_csv function
-        loaded_df = spd.read_csv(str(csv_path))
+        # Load from CSV using standalone read_csv function with date parsing
+        loaded_df = spd.read_csv(str(csv_path), parse_dates=['date_col'])
         
-        # Check data equality (convert datetime columns to same type for comparison)
-        sample_df_copy = sample_df.copy()
-        loaded_df_copy = loaded_df.copy()
-        sample_df_copy['date_col'] = pd.to_datetime(sample_df_copy['date_col'])
-        loaded_df_copy['date_col'] = pd.to_datetime(loaded_df_copy['date_col'])
-        pd.testing.assert_frame_equal(sample_df_copy, loaded_df_copy)
+        # Check data equality (no need for datetime conversion anymore)
+        pd.testing.assert_frame_equal(sample_df, loaded_df)
         
         # Check metadata
         assert loaded_df.super.name == sample_df.super.name
@@ -102,14 +98,10 @@ class TestSerialization:
             spd.read_csv(str(csv_path), require_metadata=True)
         
         # Test reading without requiring metadata
-        loaded_df = spd.read_csv(str(csv_path), require_metadata=False)
+        loaded_df = spd.read_csv(str(csv_path), require_metadata=False, parse_dates=['date_col'])
         
         # Check data equality
-        sample_df_copy = sample_df.copy()
-        loaded_df_copy = loaded_df.copy()
-        sample_df_copy['date_col'] = pd.to_datetime(sample_df_copy['date_col'])
-        loaded_df_copy['date_col'] = pd.to_datetime(loaded_df_copy['date_col'])
-        pd.testing.assert_frame_equal(sample_df_copy, loaded_df_copy)
+        pd.testing.assert_frame_equal(sample_df, loaded_df)
         
         # Check metadata is empty/default
         assert loaded_df.super.name == ''
