@@ -1,7 +1,7 @@
 from typing import Dict, Optional, Union, List, Type
 import pandas as pd
 from smolagents import Model
-from .superdataframe import SuperDataFrame
+
 # Import individual providers
 providers = {}
 
@@ -50,7 +50,7 @@ except ImportError:
 
 class LLMClient:
     """
-    Base class for LLM clients that can be used with SuperDataFrame.
+    Base class for LLM clients that can be used with pandas DataFrames via the .super accessor.
     
     This is a simple interface that can be extended to work with different LLM providers.
     """
@@ -139,12 +139,12 @@ class LLMClient:
         response = self.model(messages, **kwargs)
         return response.content
     
-    def analyze_dataframe(self, sdf: SuperDataFrame, query: str, **kwargs) -> str:
+    def analyze_dataframe(self, df: pd.DataFrame, query: str, **kwargs) -> str:
         """
         Analyze a dataframe using the LLM.
         
         Args:
-            sdf: SuperDataFrame to analyze
+            df: DataFrame to analyze
             query: The analysis query/question about the dataframe
             **kwargs: Additional arguments to pass to the model
             
@@ -152,14 +152,14 @@ class LLMClient:
             str: The model's analysis response
             
         Example:
-            >>> df = SuperDataFrame(...)
+            >>> df = pd.DataFrame(...)
             >>> client = LLMClient(...)
             >>> result = client.analyze_dataframe(df, "What are the key trends in this data?")
         """
         prompt = f"""
 Please analyze the following dataframe:
 
-{sdf.schema()}
+{df.super.schema()}
 
 Analysis request: {query}
 
@@ -167,14 +167,14 @@ Provide a clear and concise response based on the data shown above.
 """
         return self.query(prompt, **kwargs)
     
-    def generate_df_description(self, sdf: SuperDataFrame) -> str:
+    def generate_df_description(self, df: pd.DataFrame) -> str:
         """
         Generate a description for the entire DataFrame based on its contents.
         """
         prompt = f"""
         Given the following DataFrame information, provide a concise description of its contents and purpose:
         
-        {sdf.schema()}
+        {df.super.schema()}
         
         Please provide a clear, concise description of what this DataFrame represents.
         Response should be a single paragraph, no more than 2-3 sentences.
@@ -182,7 +182,7 @@ Provide a clear and concise response based on the data shown above.
         
         return self.query(prompt)
     
-    def generate_column_descriptions(self, sdf: SuperDataFrame) -> Dict[str, str]:
+    def generate_column_descriptions(self, df: pd.DataFrame) -> Dict[str, str]:
         """
         Generate descriptions for each column in the DataFrame.
         """
@@ -190,10 +190,10 @@ Provide a clear and concise response based on the data shown above.
         Given the following DataFrame information, provide concise descriptions for each column:
         
         Column Types:
-        {sdf.column_types}
+        {df.super.column_types}
         
         Sample Data:
-        {sdf.head(3).to_string()}
+        {df.head(3).to_string()}
         
         Please provide short, clear descriptions for each column.
         Format your response as a Python dictionary with column names as keys and descriptions as values.
@@ -208,14 +208,14 @@ Provide a clear and concise response based on the data shown above.
             return descriptions
         except:
             # Fallback if response isn't properly formatted
-            return {col: "No description available" for col in sdf.columns}
+            return {col: "No description available" for col in df.columns}
 
-    def generate_df_name(self, sdf: SuperDataFrame) -> str:
+    def generate_df_name(self, df: pd.DataFrame) -> str:
         """
         Generate a concise name for the DataFrame based on its contents.
         
         Args:
-            sdf: SuperDataFrame to name
+            df: DataFrame to name
             
         Returns:
             str: Generated name for the DataFrame
@@ -223,7 +223,7 @@ Provide a clear and concise response based on the data shown above.
         prompt = f"""
         Given the following DataFrame information, generate a concise, descriptive name for it:
         
-        {sdf.schema()}
+        {df.super.schema()}
         
         Please provide a short, clear name (1-5 words) that captures the essence of this dataset.
         The name should be in snake_case format (lowercase with underscores).
@@ -240,7 +240,7 @@ def auto_describe_dataframe(
     generate_df_description: bool = True,
     generate_column_descriptions: bool = True,
     **model_kwargs
-) -> SuperDataFrame:
+) -> pd.DataFrame:
     """
     Automatically generate descriptions for a DataFrame using LLMs.
     
@@ -258,29 +258,27 @@ def auto_describe_dataframe(
     """
     llm_client = LLMClient(model=model, provider_class=provider_class, **model_kwargs)
     
-    df_name = ""
-    df_description = ""
-    column_descriptions = {}
-    
-    # Convert to SuperDataFrame first if needed
-    if not isinstance(df, SuperDataFrame):
-        sdf = SuperDataFrame.from_pandas(df)
-    else:
-        sdf = df
+    # Initialize super accessor metadata if not already present
+    if 'super' not in df.attrs:
+        df.attrs['super'] = {
+            'name': '',
+            'description': '',
+            'column_descriptions': {},
+            'column_types': {}
+        }
+        df.super._infer_column_types()
     
     if generate_df_name:
-        df_name = llm_client.generate_df_name(sdf)
-        sdf.name = df_name
+        df.super.name = llm_client.generate_df_name(df)
     
     if generate_df_description:
-        df_description = llm_client.generate_df_description(sdf)
-        sdf.description = df_description
+        df.super.description = llm_client.generate_df_description(df)
     
     if generate_column_descriptions:
-        column_descriptions = llm_client.generate_column_descriptions(sdf)
-        sdf.set_column_descriptions(column_descriptions)
+        column_descriptions = llm_client.generate_column_descriptions(df)
+        df.super.set_column_descriptions(column_descriptions)
     
-    return sdf
+    return df
 
 
 class DummyLLMClient(LLMClient):
