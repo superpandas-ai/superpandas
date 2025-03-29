@@ -1,8 +1,7 @@
-import pdb
+import warnings
 import pandas as pd
 import json
-import numpy as np
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Literal, Optional
 
 
 class SuperDataFrame(pd.DataFrame):
@@ -15,7 +14,7 @@ class SuperDataFrame(pd.DataFrame):
     - schema serialization for LLMs
     """
     
-    _metadata = ['_df_name', '_df_description', '_column_descriptions', '_column_types'] + pd.DataFrame._metadata
+    _metadata = ['_df_name', '_df_description', '_column_descrSiptions', '_column_types'] + pd.DataFrame._metadata
     
     def __init__(self, *args, **kwargs):
         """
@@ -138,17 +137,46 @@ class SuperDataFrame(pd.DataFrame):
         """Get the description for a specific column"""
         return self._column_descriptions.get(column, '')
     
-    def set_column_description(self, column: str, description: str):
-        """Set the description for a specific column"""
+    def set_column_description(self, column: str, description: str, errors: Literal['raise', 'ignore', 'warn'] = 'raise'):
+        """Set the description for a specific column with error handling options
+        
+        Parameters:
+        -----------
+        column : str
+            The name of the column to set the description for
+        description : str
+            The description to set for the column
+        errors : str, default 'raise'
+            The error handling option ('raise', 'ignore', 'warn')
+        """
         if column not in self.columns:
-            raise ValueError(f"Column '{column}' does not exist in the dataframe")
+            if errors == 'raise':
+                raise ValueError(f"Column '{column}' does not exist in the dataframe")
+            elif errors == 'ignore':
+                return
+            elif errors == 'warn':
+                warnings.warn(f"Column '{column}' does not exist in the dataframe")
         self._column_descriptions[column] = description
     
-    def set_column_descriptions(self, descriptions: Dict[str, str]):
-        """Set descriptions for multiple columns at once"""
+    def set_column_descriptions(self, descriptions: Dict[str, str], errors: Literal['raise', 'ignore', 'warn'] = 'raise'):
+        """Set descriptions for multiple columns at once with error handling options
+        
+        Parameters:
+        -----------
+        descriptions : dict
+            A dictionary mapping column names to their descriptions
+        errors : str, default 'raise'
+            The error handling option ('raise', 'ignore', 'warn')
+        """
         for column, description in descriptions.items():
             if column not in self.columns:
-                raise ValueError(f"Column '{column}' does not exist in the dataframe")
+                if errors == 'raise':
+                    raise ValueError(f"Column '{column}' does not exist in the dataframe")
+                elif errors == 'ignore':
+                    continue
+                elif errors == 'warn':
+                    warnings.warn(f"Column '{column}' does not exist in the dataframe")
+
             self._column_descriptions[column] = description
     
     def schema(self, template: Optional[str] = None) -> str:
