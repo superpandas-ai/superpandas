@@ -1,5 +1,5 @@
 import pytest
-from superpandas import auto_describe_dataframe, LLMClient, DummyLLMClient
+from superpandas import LLMClient, DummyLLMClient, create_super_dataframe
 from unittest.mock import Mock, patch
 from smolagents import Model
 import pandas as pd
@@ -36,34 +36,31 @@ class TestLLMIntegration:
         assert all(col in col_descriptions for col in sample_df.columns)
         assert all(isinstance(desc, str) for desc in col_descriptions.values())
     
-    def test_auto_describe_dataframe(self, sample_df):
-        """Test auto_describe_dataframe function"""
+    def test_auto_describe_functionality(self, sample_df):
+        """Test auto_describe functionality using DummyLLMClient"""
         # Test with pandas DataFrame input
-        df = auto_describe_dataframe(
-            sample_df,
-            model=None,  # Will use default provider
-            generate_df_description=True,
+        df = create_super_dataframe(sample_df)
+        df.super.auto_describe(
+            model=DummyLLMClient(),  # Use DummyLLMClient
+            generate_name=True,
+            generate_description=True,
             generate_column_descriptions=True
         )
         
-        assert 'super' in df.attrs
         assert df.super.description != ''
         assert len(df.super.column_descriptions) > 0
         
         # Test with existing metadata
-        df2 = sample_df.copy()
-        df2.attrs['super'] = {
-            'name': 'test',
-            'description': '',
-            'column_descriptions': {},
-            'column_types': {}
-        }
-        df2.super._infer_column_types()
+        df2 = create_super_dataframe(
+            sample_df,
+            name='test',
+            description='',
+            column_descriptions={}
+        )
         
-        result = auto_describe_dataframe(
-            df2,
-            model=None,
-            generate_df_description=True,
+        result = df2.super.auto_describe(
+            model=DummyLLMClient(),
+            generate_description=True,
             generate_column_descriptions=True
         )
         

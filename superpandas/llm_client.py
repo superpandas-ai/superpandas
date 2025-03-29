@@ -1,6 +1,7 @@
 from typing import Dict, Optional, Union, List, Type
 import pandas as pd
 from smolagents import Model
+from .config import config
 
 # Import individual providers
 providers = {}
@@ -87,21 +88,22 @@ class LLMClient:
         """
         if isinstance(model, Model):
             self.model = model
-        elif isinstance(model, str):
-            provider_class = provider_class or providers.get('HfApiModel')
+        elif isinstance(model, str) or model is None:
+            # Use provided values or fall back to config values
+            model = model or config.llm_model
+            provider_class = provider_class or config.llm_provider_class
+            model_kwargs = {**config.llm_kwargs, **model_kwargs}
+            
+            if model is None and provider_class is None:
+                provider_class = providers.get('HfApiModel')
+            
             if not provider_class:
                 print("No LLM provider available. Please install smolagents with the desired provider.")
                 self.model = None
                 return
-                
+            
             try:
                 self.model = provider_class(model, **model_kwargs)
-                # Validate HfApiModel endpoint exists
-                # if provider_class == HfApiModel:
-                #     try:
-                #         self.model.client.get_endpoint_info()
-                #     except HfHubHTTPError as e:
-                #         raise ValueError(f"Model {model} not found on Hugging Face Hub: {str(e)}")
             except Exception as e:
                 print(f"Error {e} initializing model: {model} with provider {provider_class}")
                 if self.DEFAULT_LLM:
@@ -232,58 +234,21 @@ Provide a clear and concise response based on the data shown above.
         
         return self.query(prompt).strip()
 
-def auto_describe_dataframe(
-    df: pd.DataFrame,
-    model: Optional[Union[str, Model]] = None,
-    provider_class: Optional[Type[Model]] = None,
-    generate_df_name: bool = True,
-    generate_df_description: bool = True,
-    generate_column_descriptions: bool = True,
-    **model_kwargs
-) -> pd.DataFrame:
-    """
-    Automatically generate descriptions for a DataFrame using LLMs.
-    
-    Args:
-        df: Input DataFrame
-        model: Model name or instance of Model class
-        provider_class: Class to use for model provider (LiteLLMModel, OpenAIServerModel, HfApiModel, etc.)
-        generate_df_name: Whether to generate DataFrame name
-        generate_df_description: Whether to generate overall DataFrame description
-        generate_column_descriptions: Whether to generate column descriptions
-        **model_kwargs: Additional arguments to pass to the model provider
-    
-    Returns:
-        DataFrame with generated descriptions
-    """
-    llm_client = LLMClient(model=model, provider_class=provider_class, **model_kwargs)
-    
-    # Initialize super accessor metadata if not already present
-    if 'super' not in df.attrs:
-        df.attrs['super'] = {
-            'name': '',
-            'description': '',
-            'column_descriptions': {},
-            'column_types': {}
-        }
-        df.super._infer_column_types()
-    
-    if generate_df_name:
-        df.super.name = llm_client.generate_df_name(df)
-    
-    if generate_df_description:
-        df.super.description = llm_client.generate_df_description(df)
-    
-    if generate_column_descriptions:
-        column_descriptions = llm_client.generate_column_descriptions(df)
-        df.super.set_column_descriptions(column_descriptions)
-    
-    return df
-
-
 class DummyLLMClient(LLMClient):
     """A dummy LLM client for testing purposes"""
     
     def query(self, prompt: str, **kwargs) -> str:
         """Return a simple acknowledgment of the prompt"""
-        return f"Received prompt of length {len(prompt)}. This is a dummy response." 
+        return f"Received prompt of length {len(prompt)}. This is a dummy response."
+    
+    def generate_df_name(self, df: pd.DataFrame) -> str:
+        """Generate a dummy DataFrame name"""
+        return "dummy_dataframe_name"
+    
+    def generate_df_description(self, df: pd.DataFrame) -> str:
+        """Generate a dummy DataFrame description"""
+        return "This is a dummy response for DataFrame description."
+    
+    def generate_column_descriptions(self, df: pd.DataFrame) -> dict:
+        """Generate dummy column descriptions"""
+        return {col: "This is a dummy response for column description." for col in df.columns} 

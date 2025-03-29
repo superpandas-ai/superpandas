@@ -4,6 +4,8 @@ import numpy as np
 from superpandas import create_super_dataframe
 import json
 import os
+from superpandas import config
+from superpandas.llm_client import DummyLLMClient
 
 class TestSuperDataFrameBasics:
     """Test basic super accessor functionality"""
@@ -288,3 +290,81 @@ class TestSuperDataFrameIO:
         assert loaded_df.super.get_column_description('B') == 'Letters'
         assert list(loaded_df.columns) == ['A', 'B']
         pd.testing.assert_frame_equal(pd.DataFrame(original_df), pd.DataFrame(loaded_df)) 
+
+class TestAutoDescribe:
+    """Test auto_describe functionality"""
+    
+    def test_auto_describe_with_config(self, sample_df):
+        """Test auto_describe using config settings"""
+        from superpandas import create_super_dataframe
+        
+        # Create test DataFrame with super accessor
+        df = create_super_dataframe(sample_df)
+        
+        # Configure global settings
+        config.configure_llm(
+            model=DummyLLMClient(),
+            existing_values='warn'
+        )
+        
+        # Test with default config settings
+        df.super.auto_describe()
+        
+        # Test with override
+        df.super.auto_describe(existing_values='overwrite')
+        
+        # Test with existing values
+        df.super.name = "Existing Name"
+        df.super.description = "Existing Description"
+        df.super.set_column_descriptions({'int_col': 'Existing description'})
+        
+        # Should warn but not overwrite with default settings
+        with pytest.warns(UserWarning):
+            df.super.auto_describe()
+        assert df.super.name == "Existing Name"
+        
+        # Should skip silently
+        df.super.auto_describe(existing_values='skip')
+        assert df.super.name == "Existing Name"
+        
+        # Should overwrite
+        df.super.auto_describe(existing_values='overwrite')
+        assert df.super.name != "Existing Name"
+
+    def test_auto_describe_partial_metadata(self, sample_df):
+        """Test auto_describe with partial existing metadata"""
+        from superpandas import create_super_dataframe
+        
+        df = create_super_dataframe(sample_df)
+        
+        # Set some metadata but leave others empty
+        df.super.name = "Existing Name"
+        # Leave description empty
+        df.super.set_column_descriptions({'int_col': 'Integer column'})
+        
+        # Configure to skip existing values
+        config.configure_llm(existing_values='skip',
+                             model=DummyLLMClient())
+        
+        # Should only generate missing metadata
+        df.super.auto_describe()
+        
+        assert df.super.name == "Existing Name"  # Should not change
+        assert df.super.description != ""  # Should be generated
+        assert df.super.get_column_description('int_col') == 'Integer column'  # Should not change
+        assert df.super.get_column_description('float_col') != ""  # Should be generated
+
+    def test_auto_describe_empty_dataframe(self):
+        """Test auto_describe with empty DataFrame"""
+        import pandas as pd
+        from superpandas import create_super_dataframe
+        
+        # Create empty DataFrame
+        df = create_super_dataframe(pd.DataFrame())
+        
+        # Should handle empty DataFrame gracefully
+        df.super.auto_describe()
+        
+        assert isinstance(df.super.name, str)
+        assert isinstance(df.super.description, str)
+        assert isinstance(df.super.column_descriptions, dict) 

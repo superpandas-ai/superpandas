@@ -1,8 +1,8 @@
-import pdb
 import warnings
 import pandas as pd
 import json
-from typing import Dict, Literal, Optional
+from typing import Dict, Literal, Optional, Union, Type
+from smolagents import Model
 
 @pd.api.extensions.register_dataframe_accessor("super")
 class SuperDataFrameAccessor:
@@ -454,6 +454,94 @@ Columns:
                 'column_types': {}
             }
             self._infer_column_types()
+
+    def auto_describe(self,
+                     model: Optional[Union[str, Model]] = None,
+                     provider_class: Optional[Type[Model]] = None,
+                     generate_name: bool = True,
+                     generate_description: bool = True,
+                     generate_column_descriptions: bool = True,
+                     existing_values: Optional[Literal['warn', 'skip', 'overwrite']] = None,
+                     **model_kwargs) -> pd.DataFrame:
+        """
+        Automatically generate descriptions for this DataFrame using LLMs.
+        
+        Args:
+            model: Model name or instance of Model class. If None, uses the model from config
+            provider_class: Class to use for model provider. If None, uses the provider from config
+            generate_name: Whether to generate DataFrame name
+            generate_description: Whether to generate overall DataFrame description
+            generate_column_descriptions: Whether to generate column descriptions
+            existing_values: How to handle existing metadata values. If None, uses value from config:
+                - 'warn': Warn and skip if value exists
+                - 'skip': Silently skip if value exists
+                - 'overwrite': Replace existing values
+            **model_kwargs: Additional arguments to pass to the model provider
+        
+        Returns:
+            self._obj: The DataFrame with updated descriptions
+            
+        Example:
+            >>> df = pd.DataFrame(...)
+            >>> df.super.auto_describe()  # Uses config settings
+            >>> df.super.auto_describe(model="gpt-4")  # Uses specific model
+            >>> # Skip existing values without warning
+            >>> df.super.auto_describe(existing_values='skip')
+            >>> # Overwrite any existing values
+            >>> df.super.auto_describe(existing_values='overwrite')
+        """
+        from .llm_client import LLMClient
+        from .config import config
+        
+        # Use config values if no explicit values provided
+        if model is None:
+            model = config.llm_model
+        if provider_class is None:
+            provider_class = config.llm_provider_class
+        
+        # Merge config kwargs with provided kwargs, handling existing_values specially
+        merged_kwargs = {**config.llm_kwargs, **model_kwargs}
+        if existing_values is not None:
+            merged_kwargs['existing_values'] = existing_values
+        existing_values = merged_kwargs.pop('existing_values', 'warn')
+        
+        llm_client = LLMClient(model=model, provider_class=provider_class, **merged_kwargs)
+        
+        if generate_name:
+            if self.name and existing_values != 'overwrite':
+                if existing_values == 'warn':
+                    warnings.warn(f"DataFrame already has a name: '{self.name}'. Skipping name generation.")
+            else:
+                self.name = llm_client.generate_df_name(self._obj)
+        
+        if generate_description:
+            if self.description and existing_values != 'overwrite':
+                if existing_values == 'warn':
+                    warnings.warn("DataFrame already has a description. Skipping description generation.")
+            else:
+                self.description = llm_client.generate_df_description(self._obj)
+        
+        if generate_column_descriptions:
+            existing_cols = {col: desc for col, desc in self.column_descriptions.items() if desc}
+            if existing_cols and existing_values != 'overwrite':
+                if existing_values == 'warn':
+                    warnings.warn(f"Some columns already have descriptions: {list(existing_cols.keys())}. "
+                                "Skipping those columns.")
+                # Only generate descriptions for columns without existing descriptions
+                cols_to_describe = set(self._obj.columns) - set(existing_cols.keys())
+                if cols_to_describe:
+                    new_descriptions = llm_client.generate_column_descriptions(self._obj)
+                    # Merge new descriptions with existing ones
+                    merged_descriptions = {**existing_cols, 
+                                        **{k: v for k, v in new_descriptions.items() 
+                                           if k in cols_to_describe}}
+                    self.set_column_descriptions(merged_descriptions)
+            else:
+                # Generate descriptions for all columns
+                column_descriptions = llm_client.generate_column_descriptions(self._obj)
+                self.set_column_descriptions(column_descriptions)
+        
+        return self._obj
 
 def read_csv(path: str, require_metadata: bool = True, **kwargs) -> pd.DataFrame:
     """
