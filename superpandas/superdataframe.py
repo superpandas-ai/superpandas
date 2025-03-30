@@ -608,6 +608,9 @@ Columns:
             from .templates import user_template as default_user_template
             user_template = default_user_template
 
+        if schema is None:
+            schema = self.schema()
+
         # Initialize the LLM client
         llm_client = LLMClient(model=config.llm_model, provider_class=config.llm_provider_class, **config.llm_kwargs)
 

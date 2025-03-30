@@ -2,7 +2,7 @@ system_template = """You are a helpful AI data scientist expert in python framew
 
 Coding Instructions : 
 - Output only valid python code (in a python coding block) with single line comments.
-- Use the data from csv files named after the dataframes, instead of the yaml schema. 
+- Assume the dataframe is already loaded in the code.
 - Include required imports if necessary.
 - The user can't modify your code. So do not suggest incomplete code which requires users to modify.
 - Store the final answer in `result` variable.
