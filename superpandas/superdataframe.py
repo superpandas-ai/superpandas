@@ -1,6 +1,7 @@
 import warnings
 import pandas as pd
 import json
+import yaml
 from typing import Dict, Literal, Optional, Union, Type
 from smolagents import Model
 
@@ -133,7 +134,7 @@ class SuperDataFrameAccessor:
             Available placeholders:
             - {name}: The dataframe name
             - {description}: The dataframe description
-            - {columns}: The formatted column information
+            - {columns}: The formatted column information, including refined type and description
             - {dtypes}: The dataframe dtypes
             - {shape}: The dataframe shape
             
@@ -180,7 +181,7 @@ Columns:
         Parameters:
         -----------
         format_type : str, default 'json'
-            The format to convert to ('json', 'markdown', 'text')
+            The format to convert to ('json', 'markdown', 'text', 'yaml')
         max_rows : int, default 5
             Maximum number of rows to include
         
@@ -247,6 +248,28 @@ Columns:
             text += "\nData Sample:\n"
             text += sample_df.to_string()
             return text
+
+        elif format_type == 'yaml':
+            # Create a dictionary with metadata and data
+            result = {
+                'metadata': {
+                    "name": self.name,
+                    "description": self.description,
+                    "shape": self._obj.shape,
+                    "columns": {
+                        col: {
+                            "pandas_dtype": str(self._obj.dtypes[col]),
+                            "refined_type": self.column_types.get(col, str(self._obj.dtypes[col])),
+                            "description": self.column_descriptions.get(col, "")
+                        } for col in self._obj.columns
+                    }
+                }
+            }
+            
+            if max_rows > 0:
+                result["data"] = json.loads(pd.DataFrame(sample_df).reset_index(drop=True).to_json(orient='records', date_format='iso'))
+            
+            return yaml.dump(result, default_flow_style=False)
             
         else:
             raise ValueError(f"Unsupported format type: {format_type}.")
@@ -542,6 +565,60 @@ Columns:
                 self.set_column_descriptions(column_descriptions)
         
         return self._obj
+
+    def __str__(self):
+        return (f"SuperDataFrameAccessor("
+                f"name={self.name}, "
+                f"description={self.description}, "
+                f"column_descriptions={self.column_descriptions}, "
+                f"column_types={self.column_types})")
+
+    def __repr__(self):
+        return self.__str__()
+
+    def query(self, question: str, schema: Optional[str] = None, system_template: Optional[str] = None, user_template: Optional[str] = None) -> str:
+        """
+        Query the DataFrame using an LLM with a given question and optional templates.
+        
+        Parameters:
+        -----------
+        question : str
+            The question to ask about the DataFrame.
+        schema : str, optional
+            The schema of the DataFrame.
+        system_template : str, optional
+            A system template string for formatting the query message.
+        user_template : str, optional
+            A user template string for formatting the query message.
+        
+        Returns:
+        --------
+        str
+            The response from the LLM.
+        """
+        from .llm_client import LLMClient
+        from .config import config
+
+        # Use the system template from config if no system template is provided
+        if system_template is None:
+            system_template = config.system_template
+
+        # Use the user template from config if no user template is provided
+        if user_template is None:
+            from .templates import user_template as default_user_template
+            user_template = default_user_template
+
+        # Initialize the LLM client
+        llm_client = LLMClient(model=config.llm_model, provider_class=config.llm_provider_class, **config.llm_kwargs)
+
+        # Format the message using the provided templates
+        system_message = system_template.format(schema=schema)
+        user_message = user_template.format(schema=schema, question=question)
+
+        # Query the LLM client
+        response = llm_client.query(system_message=system_message, user_message=user_message)
+
+        return response
 
 def read_csv(path: str, require_metadata: bool = True, **kwargs) -> pd.DataFrame:
     """

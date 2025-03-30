@@ -2,6 +2,16 @@
 
 SuperPandas is a Python package that extends pandas DataFrame functionality with rich metadata to allow for AI-powered analysis on your Pandas DataFrames.
 
+## Key Features
+
+### Enhanced DataFrame with Metadata
+- **Rich Metadata Support**: Add names, descriptions, and detailed column information to your DataFrames, which allows for better representation of Pandas DataFrames in LLM applications.
+- **Automatically generate metadata**: Automatically generate metadata for your DataFrames using LLMs from various providers like OpenAI, Hugging Face, and more.
+- **Intelligent Type Inference**: Automatically detects and tracks detailed column types, especially for object columns.
+- **Schema Generation**: Generate clear schema representations for documentation or LLM analysis.
+- **Serialization**: Save and load DataFrames with all metadata intact.
+- **Drop-in replacement for Pandas DataFrames**: SuperPandas is a lightweight wrapper around pandas DataFrames, so you can use it as a drop-in replacement for your existing code.
+
 ## Installation
 
 You can install SuperPandas using pip:
@@ -16,21 +26,13 @@ Or install the latest development version from GitHub:
 pip install git+https://github.com/superpandas-ai/superpandas.git
 ```
 
-## Key Features
-
-### Enhanced DataFrame with Metadata
-- **Rich Metadata Support**: Add names, descriptions, and detailed column information to your DataFrames, which allows for better representation of Pandas DataFrames in LLM applications
-- **Automatically generate metadata**: Automatically generate metadata for your DataFrames using LLMs from various providers like OpenAI, Hugging Face, and more.
-- **Intelligent Type Inference**: Automatically detects and tracks detailed column types, especially for object columns.
-- **Schema Generation**: Generate clear schema representations for documentation or LLM analysis
-- **Serialization**: Save and load DataFrames with all metadata intact
-- **Drop-in replacement for Pandas DataFrames**: SuperPandas is a lightweight wrapper around pandas DataFrames, so you can use it as a drop-in replacement for your existing code.
+## Usage
 
 ```python
 import superpandas as spd
 
 # Create a SuperDataFrame with metadata
-df = spd.SuperDataFrame(data, 
+sdf = spd.create_super_dataframe(df, 
     name="sales_data",
     description="Monthly sales data by region",
     column_descriptions={
@@ -40,17 +42,17 @@ df = spd.SuperDataFrame(data,
 )
 
 # Access metadata
-print(df.name)  # "sales_data"
-print(df.description)
-print(df.column_descriptions)
-print(df.column_types)  # Shows refined type information
+print(sdf.super.name)  # "sales_data"
+print(sdf.super.description)
+print(sdf.super.column_descriptions)
+print(sdf.super.column_types)  # Shows refined type information
 ```
 
 ### LLM Integration
-- **Built-in LLM Support**: Seamless integration with various LLM providers
-- **Automated Analysis**: Get AI-powered insights about your data
-- **Auto-Documentation**: Generate descriptions and documentation automatically
-- **Flexible Provider System**: Support for multiple LLM providers through a unified interface
+- **Built-in LLM Support**: Seamless integration with various LLM providers using the `smolagents` package.
+- **Automated Analysis**: Get AI-powered insights about your data.
+- **Auto-Documentation**: Generate descriptions and documentation automatically.
+- **Flexible Provider System**: Support for multiple LLM providers through a unified interface.
 
 ```python
 from superpandas import LLMClient
@@ -59,11 +61,10 @@ from superpandas import LLMClient
 llm = LLMClient(model="meta-llama/Llama-3.2-3B-Instruct")
 
 # Auto-describe your DataFrame
-df = spd.auto_describe_dataframe(
-    df,
+df.super.auto_describe(
     model="meta-llama/Llama-3.2-3B-Instruct",
-    generate_df_name=True,
-    generate_df_description=True,
+    generate_name=True,
+    generate_description=True,
     generate_column_descriptions=True
 )
 
@@ -77,20 +78,18 @@ column_descriptions = llm.generate_column_descriptions(df)
 ```
 
 ### Enhanced Serialization
-- **Metadata Preservation**: Save and load DataFrames with all metadata intact
-- **Multiple Format Support**: Export to CSV, JSON, and pickle with metadata
-- **Backwards Compatibility**: Works seamlessly with standard pandas operations
+- **Metadata Preservation**: Save and load DataFrames with all metadata intact.
+- **Multiple Format Support**: Export to CSV and pickle with metadata. (JSON format coming soon)
+- **Backwards Compatibility**: Works seamlessly with standard pandas operations.
 
 ```python
 # Save with metadata
-df.to_json("data.json")
-df.to_csv("data.csv", include_metadata=True)
-df.to_pickle("data.pkl")
+df.super.to_csv("data.csv", include_metadata=True, index=False)
+df.super.to_pickle("data.pkl")
 
 # Load with metadata
-df = spd.SuperDataFrame.read_json("data.json")
-df = spd.SuperDataFrame.read_csv("data.csv", load_metadata=True)
-df = spd.SuperDataFrame.read_pickle("data.pkl")
+df = spd.read_csv("data.csv", require_metadata=True)
+df = spd.read_pickle("data.pkl")
 ```
 
 ### LLM Provider Support
@@ -135,11 +134,10 @@ column_descriptions = llm.generate_column_descriptions(df)
 df_name = llm.generate_df_name(df)
 
 # Automatically generate all metadata at once
-enhanced_df = spd.auto_describe_dataframe(
-    df,
+df.super.auto_describe(
     model="meta-llama/Llama-3.2-3B-Instruct",
-    generate_df_name=True,
-    generate_df_description=True,
+    generate_name=True,
+    generate_description=True,
     generate_column_descriptions=True
 )
 ```
@@ -175,15 +173,15 @@ Columns: {shape[1]}
 """
 
 # Generate schema with custom template
-schema = df.schema(template=template)
+schema = df.super.schema(template=template)
 ```
 
 ### LLM Format Options
 ```python
 # Convert to LLM-friendly formats
-json_format = df.to_llm_format(format_type='json')
-markdown_format = df.to_llm_format(format_type='markdown')
-text_format = df.to_llm_format(format_type='text')
+json_format = df.super.to_llm_format(format_type='json')
+markdown_format = df.super.to_llm_format(format_type='markdown')
+text_format = df.super.to_llm_format(format_type='text')
 ```
 
 ### LLM Analysis Options

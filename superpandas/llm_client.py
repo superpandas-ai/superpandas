@@ -1,3 +1,4 @@
+import pdb
 from typing import Dict, Optional, Union, List, Type
 import pandas as pd
 from smolagents import Model
@@ -20,7 +21,6 @@ except ImportError:
 
 try:
     from smolagents import HfApiModel
-    from huggingface_hub.errors import HfHubHTTPError
     providers['HfApiModel'] = HfApiModel
 except ImportError:
     pass
@@ -57,7 +57,7 @@ class LLMClient:
     """
     
     # Default to using HfApiModel with Llama 3.2
-    DEFAULT_LLM = providers.get('HfApiModel', lambda x: None)("meta-llama/Llama-3.2-3B-Instruct")
+    DEFAULT_LLM = providers.get('HfApiModel', lambda x: None)("meta-llama/Llama-3.2-3B-Instruct") # Qwen/Qwen2.5-Coder-32B-Instruct
     
     @staticmethod
     def available_providers() -> Dict[str, Type[Model]]:
@@ -76,7 +76,7 @@ class LLMClient:
 
     def __init__(self, 
                  model: Optional[Union[str, Model]] = None,
-                 provider_class: Optional[Type[Model]] = None,
+                 provider_class: Optional[Type[Model] | str] = None,
                  **model_kwargs):
         """
         Initialize with specified LLM provider.
@@ -86,7 +86,7 @@ class LLMClient:
             provider_class: Class to use for model provider (LiteLLMModel, OpenAIServerModel, HfApiModel, etc.)
             **model_kwargs: Additional arguments to pass to the model provider
         """
-        if isinstance(model, Model):
+        if isinstance(model, (Model, DummyLLMClient)):
             self.model = model
         elif isinstance(model, str) or model is None:
             # Use provided values or fall back to config values
@@ -94,11 +94,14 @@ class LLMClient:
             provider_class = provider_class or config.llm_provider_class
             model_kwargs = {**config.llm_kwargs, **model_kwargs}
 
-            # Remove existing_values from model_kwargs
+            # Remove existing_values from model_kwargs which are not required for the LLM client
             model_kwargs.pop('existing_values', None)
             
             if model is None and provider_class is None:
                 provider_class = providers.get('HfApiModel')
+
+            if isinstance(provider_class, str):
+                provider_class = providers.get(provider_class)
             
             if not provider_class:
                 print("No LLM provider available. Please install smolagents with the desired provider.")
@@ -106,71 +109,57 @@ class LLMClient:
                 return
             
             try:
-                self.model = provider_class(model, **model_kwargs)
+                self.model = provider_class(model_id=model, **model_kwargs)
             except Exception as e:
                 print(f"Error {e} initializing model: {model} with provider {provider_class}")
                 if self.DEFAULT_LLM:
-                    print(f"Using default provider: {self.DEFAULT_LLM}")
+                    print(f"Using default provider: {self.DEFAULT_LLM.model_id}")
                     self.model = self.DEFAULT_LLM
                 else:
                     print("No default provider available. Please install smolagents with the desired provider.")
                     self.model = None
-        else:
-            if self.DEFAULT_LLM:
-                print(f"Using default provider: {str(self.DEFAULT_LLM)}")
-                self.model = self.DEFAULT_LLM
-            else:
-                print("No default provider available. Please install smolagents with the desired provider.")
-                self.model = None
+
     
-    def query(self, prompt: str, **kwargs) -> str:
+    def query(self, user_message: str, 
+              system_message: Optional[str] = None, 
+              **kwargs) -> str:
         """
         Send a query to the LLM and return the response.
         
-        Args:
-            prompt: The prompt to send to the model
-            **kwargs: Additional arguments to pass to the model
+        Parameters:
+        -----------
+        user_message : str
+            The user message to send to the model
+        system_message : str, optional
+            The system message to use for the model, by default None
+        **kwargs : dict
+            Additional arguments to pass to the model
         
         Returns:
-            str: The model's response
+        --------
+        str
+            The model's response
         
         Raises:
-            RuntimeError: If no LLM provider is available
+        -------
+        RuntimeError
+            If no LLM provider is available
         """
         if not self.model:
             raise RuntimeError("No LLM provider available")
             
-        messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
+        if system_message:
+            messages = [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_message}
+            ]
+        else:
+            messages = [
+                {"role": "user", "content": [{"type": "text", "text": user_message}]}
+            ]
+        
         response = self.model(messages, **kwargs)
         return response.content
-    
-    def analyze_dataframe(self, df: pd.DataFrame, query: str, **kwargs) -> str:
-        """
-        Analyze a dataframe using the LLM.
-        
-        Args:
-            df: DataFrame to analyze
-            query: The analysis query/question about the dataframe
-            **kwargs: Additional arguments to pass to the model
-            
-        Returns:
-            str: The model's analysis response
-            
-        Example:
-            >>> df = pd.DataFrame(...)
-            >>> client = LLMClient(...)
-            >>> result = client.analyze_dataframe(df, "What are the key trends in this data?")
-        """
-        prompt = f"""
-Please analyze the following dataframe:
-
-{df.super.schema()}
-
-Analysis request: {query}
-
-Provide a clear and concise response based on the data shown above.
-"""
-        return self.query(prompt, **kwargs)
     
     def generate_df_description(self, df: pd.DataFrame) -> str:
         """
@@ -240,9 +229,14 @@ Provide a clear and concise response based on the data shown above.
 class DummyLLMClient(LLMClient):
     """A dummy LLM client for testing purposes"""
     
-    def query(self, prompt: str, **kwargs) -> str:
+    def __init__(self, *args, **kwargs):
+        """Initialize the dummy client"""
+        # Skip parent initialization
+        self.model = self  # Set self as the model to prevent None
+    
+    def query(self, user_message: str, system_message: Optional[str] = None, **kwargs) -> str:
         """Return a simple acknowledgment of the prompt"""
-        return f"Received prompt of length {len(prompt)}. This is a dummy response."
+        return f"Received user message of length {len(user_message)}. This is a dummy response."
     
     def generate_df_name(self, df: pd.DataFrame) -> str:
         """Generate a dummy DataFrame name"""
@@ -254,4 +248,10 @@ class DummyLLMClient(LLMClient):
     
     def generate_column_descriptions(self, df: pd.DataFrame) -> dict:
         """Generate dummy column descriptions"""
-        return {col: "This is a dummy response for column description." for col in df.columns} 
+        return {col: "This is a dummy response for column description." for col in df.columns}
+    
+    def __call__(self, messages, **kwargs):
+        """Mock the model's __call__ method"""
+        class DummyResponse:
+            content = "This is a dummy response"
+        return DummyResponse() 
