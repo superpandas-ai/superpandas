@@ -520,7 +520,7 @@ Columns:
         if model is None:
             model = config.llm_model
         if provider_class is None:
-            provider_class = config.llm_provider_class
+            provider_class = config.llm_provider
         
         # Merge config kwargs with provided kwargs, handling existing_values specially
         merged_kwargs = {**config.llm_kwargs, **model_kwargs}
@@ -612,7 +612,7 @@ Columns:
             schema = self.schema()
 
         # Initialize the LLM client
-        llm_client = LLMClient(model=config.llm_model, provider_class=config.llm_provider_class, **config.llm_kwargs)
+        llm_client = LLMClient(model=config.llm_model, provider_class=config.llm_provider, **config.llm_kwargs)
 
         # Format the message using the provided templates
         system_message = system_template.format(schema=schema)

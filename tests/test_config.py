@@ -15,8 +15,8 @@ class TestConfig:
     def test_llm_settings(self):
         """Test setting and getting LLM configuration"""
         # Test initial values
-        assert config.llm_model is None
-        assert config.llm_provider_class is None
+        assert config.llm_model == "meta-llama/Llama-3.2-3B-Instruct"
+        assert config.llm_provider == "HfApiModel"
         assert 'existing_values' in config.llm_kwargs
         assert config.llm_kwargs['existing_values'] == 'warn'
         
@@ -25,11 +25,11 @@ class TestConfig:
             def query(self, prompt): return "dummy"
         
         config.llm_model = "test-model"
-        config.llm_provider_class = DummyProvider
+        config.llm_provider = DummyProvider
         config.llm_kwargs.update({'temperature': 0.7})
         
         assert config.llm_model == "test-model"
-        assert config.llm_provider_class == DummyProvider
+        assert config.llm_provider == DummyProvider
         assert config.llm_kwargs['temperature'] == 0.7
         assert config.llm_kwargs['existing_values'] == 'warn'
         
@@ -46,7 +46,7 @@ class TestConfig:
         )
         
         assert config.llm_model == "test-model"
-        assert config.llm_provider_class == DummyProvider
+        assert config.llm_provider == DummyProvider
         assert config.llm_kwargs['temperature'] == 0.5
         assert config.llm_kwargs['existing_values'] == 'skip'
     

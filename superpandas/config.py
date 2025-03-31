@@ -1,7 +1,7 @@
 """
 Configuration settings for SuperPandas
 """
-from typing import Optional, Type, Union, Literal
+from typing import Optional, Type, Union
 from smolagents import Model
 from .templates import system_template  # Import the system_template
 
@@ -10,7 +10,7 @@ class SuperPandasConfig:
     Global configuration settings for SuperPandas.
     
     Attributes:
-        llm_provider_class (Type[Model]): The default LLM provider class to use
+        llm_provider (Type[Model]): The default LLM provider class to use
         llm_model (Union[str, Model]): The default model name or instance to use
         llm_kwargs (dict): Additional keyword arguments for LLM initialization, including:
             - existing_values: How to handle existing metadata ('warn', 'skip', 'overwrite')
@@ -23,21 +23,21 @@ class SuperPandasConfig:
         if cls._instance is None:
             cls._instance = super(SuperPandasConfig, cls).__new__(cls)
             # Initialize default settings
-            cls._instance._llm_provider_class = None
-            cls._instance._llm_model = None
+            cls._instance._llm_provider = "HfApiModel"
+            cls._instance._llm_model = "meta-llama/Llama-3.2-3B-Instruct"
             cls._instance._llm_kwargs = {'existing_values': 'warn'}
             cls._instance._system_template = system_template  # Set default system template
         return cls._instance
     
     @property
-    def llm_provider_class(self) -> Optional[Type[Model]]:
+    def llm_provider(self) -> Optional[Type[Model]]:
         """Get the default LLM provider class"""
-        return self._llm_provider_class
+        return self._llm_provider
     
-    @llm_provider_class.setter
-    def llm_provider_class(self, value: Optional[Type[Model]]):
+    @llm_provider.setter
+    def llm_provider(self, value: Optional[Type[Model]]):
         """Set the default LLM provider class"""
-        self._llm_provider_class = value
+        self._llm_provider = value
     
     @property
     def llm_model(self) -> Optional[Union[str, Model]]:
@@ -87,7 +87,7 @@ class SuperPandasConfig:
                 - existing_values: How to handle existing metadata ('warn', 'skip', 'overwrite')
         """
         if provider_class is not None:
-            self.llm_provider_class = provider_class
+            self.llm_provider = provider_class
         if model is not None:
             self.llm_model = model
         if system_template is not None:
@@ -99,7 +99,7 @@ class SuperPandasConfig:
 
     def __str__(self):
         return (f"SuperPandasConfig("
-                f"llm_provider_class={self.llm_provider_class}, "
+                f"llm_provider={self.llm_provider}, "
                 f"llm_model={self.llm_model}, "
                 f"llm_kwargs={self.llm_kwargs}, "
                 f"system_template={self.system_template})")

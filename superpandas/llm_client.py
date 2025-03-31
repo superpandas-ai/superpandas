@@ -91,7 +91,7 @@ class LLMClient:
         elif isinstance(model, str) or model is None:
             # Use provided values or fall back to config values
             model = model or config.llm_model
-            provider_class = provider_class or config.llm_provider_class
+            provider_class = provider_class or config.llm_provider
             model_kwargs = {**config.llm_kwargs, **model_kwargs}
 
             # Remove existing_values from model_kwargs which are not required for the LLM client
