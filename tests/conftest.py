@@ -2,6 +2,7 @@ import pytest
 import pandas as pd
 import numpy as np
 import os
+from superpandas import create_super_dataframe
 
 @pytest.fixture
 def sample_df():
@@ -20,19 +21,16 @@ def sample_df():
 @pytest.fixture
 def sample_super_df(sample_df):
     """Create a sample DataFrame with super metadata for testing"""
-    df = sample_df.copy()
-    df.attrs['super'] = {
-        'name': "Test DataFrame",
-        'description': "A test dataframe with various column types",
-        'column_descriptions': {
+    return create_super_dataframe(
+        sample_df,
+        name="Test DataFrame",
+        description="A test dataframe with various column types",
+        column_descriptions={
             'int_col': 'Integer column',
             'float_col': 'Float column',
             'str_col': 'String column'
-        },
-        'column_types': {}
-    }
-    df.super._infer_column_types()
-    return df
+        }
+    )
 
 @pytest.fixture
 def titanic_csv_path():

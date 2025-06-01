@@ -52,7 +52,7 @@ class TestSerialization:
         # Check metadata
         assert loaded_df.super.name == sample_df.super.name
         assert loaded_df.super.description == sample_df.super.description
-        assert loaded_df.super.column_descriptions == sample_df.super.column_descriptions
+        assert loaded_df.super.get_column_descriptions() == sample_df.super.get_column_descriptions()
         assert loaded_df.super.column_types == sample_df.super.column_types
 
     def test_csv_serialization(self, sample_df, temp_dir):
@@ -77,7 +77,7 @@ class TestSerialization:
         # Check metadata
         assert loaded_df.super.name == sample_df.super.name
         assert loaded_df.super.description == sample_df.super.description
-        assert loaded_df.super.column_descriptions == sample_df.super.column_descriptions
+        assert loaded_df.super.get_column_descriptions() == sample_df.super.get_column_descriptions()
         assert loaded_df.super.column_types == sample_df.super.column_types
 
     def test_csv_serialization_no_metadata(self, sample_df, temp_dir):
@@ -95,10 +95,10 @@ class TestSerialization:
         
         # Test that reading with require_metadata=True raises error
         with pytest.raises(FileNotFoundError):
-            spd.read_csv(str(csv_path), require_metadata=True)
+            spd.read_csv(str(csv_path), include_metadata=True)
         
         # Test reading without requiring metadata
-        loaded_df = spd.read_csv(str(csv_path), require_metadata=False, parse_dates=['date_col'])
+        loaded_df = spd.read_csv(str(csv_path), include_metadata=False, parse_dates=['date_col'])
         
         # Check data equality
         pd.testing.assert_frame_equal(sample_df, loaded_df)
@@ -106,7 +106,7 @@ class TestSerialization:
         # Check metadata is empty/default
         assert loaded_df.super.name == ''
         assert loaded_df.super.description == ''
-        assert loaded_df.super.column_descriptions == {}
+        assert loaded_df.super.get_column_descriptions() == {}
         assert isinstance(loaded_df.super.column_types, dict)
 
     # def test_edge_cases(self, temp_dir):
@@ -138,7 +138,7 @@ class TestSerialization:
     #     # Check metadata
     #     assert loaded_df.super.name == df.super.name
     #     assert loaded_df.super.description == df.super.description
-    #     assert loaded_df.super.column_descriptions == df.super.column_descriptions
+    #     assert loaded_df.super.get_column_descriptions() == df.super.get_column_descriptions()
     #     assert loaded_df.super.column_types == df.super.column_types
     
 
@@ -169,3 +169,55 @@ class TestSerialization:
     #     df_invalid.super.read_json(str(invalid_json_path))
     #     assert df_invalid.super.name == ''
     #     assert df_invalid.super.description == '' 
+
+    def test_pickle_serialization_new_interface(self, temp_dir):
+        """Test pickle serialization and deserialization with the new interface"""
+        # Create test data
+        df = create_super_dataframe(
+            {'A': [1, 2, 3], 'B': ['x', 'y', 'z']},
+            name="Test DF",
+            description="Test description",
+            column_descriptions={
+                'A': 'Numbers',
+                'B': 'Letters'
+            }
+        )
+        
+        # Save to pickle
+        pickle_path = os.path.join(temp_dir, "test.pkl")
+        df.super.to_pickle(pickle_path)
+        
+        # Read it back
+        loaded_df = pd.read_pickle(pickle_path)
+        
+        # Verify data and metadata
+        assert 'super' in loaded_df.attrs
+        assert loaded_df.super.name == "Test DF"
+        assert loaded_df.super.description == "Test description"
+        assert loaded_df.super.get_column_descriptions() == df.super.get_column_descriptions()
+        assert list(loaded_df.columns) == ['A', 'B']
+        pd.testing.assert_frame_equal(pd.DataFrame(df), pd.DataFrame(loaded_df))
+
+    def test_pickle_serialization_new_interface_empty(self, temp_dir):
+        """Test pickle serialization and deserialization with the new interface when column descriptions are empty"""
+        # Create test data
+        df = create_super_dataframe(
+            {'A': [1, 2, 3], 'B': ['x', 'y', 'z']},
+            name="Test DF",
+            description="Test description"
+        )
+        
+        # Save to pickle
+        pickle_path = os.path.join(temp_dir, "test.pkl")
+        df.super.to_pickle(pickle_path)
+        
+        # Read it back
+        loaded_df = pd.read_pickle(pickle_path)
+        
+        # Verify data and metadata
+        assert 'super' in loaded_df.attrs
+        assert loaded_df.super.name == "Test DF"
+        assert loaded_df.super.description == "Test description"
+        assert loaded_df.super.get_column_descriptions() == {}
+        assert list(loaded_df.columns) == ['A', 'B']
+        pd.testing.assert_frame_equal(pd.DataFrame(df), pd.DataFrame(loaded_df)) 

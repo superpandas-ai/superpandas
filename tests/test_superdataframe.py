@@ -4,7 +4,7 @@ import numpy as np
 from superpandas import create_super_dataframe
 import json
 import os
-from superpandas import config
+from superpandas import SuperPandasConfig
 from superpandas.llm_client import DummyLLMClient
 
 class TestSuperDataFrameBasics:
@@ -45,7 +45,7 @@ class TestSuperDataFrameBasics:
         # Test getters
         assert sample_super_df.super.name == "Test DataFrame"
         assert sample_super_df.super.description == "A test dataframe with various column types"
-        assert sample_super_df.super.column_descriptions['int_col'] == 'Integer column'
+        assert sample_super_df.super.get_column_description('int_col') == 'Integer column'
         
         # Test setters
         sample_super_df.super.name = "Updated Name"
@@ -56,7 +56,7 @@ class TestSuperDataFrameBasics:
         assert sample_super_df.super.description == "Updated description"
         assert sample_super_df.super.get_column_description('bool_col') == 'Boolean column'
         
-        # Test set_column_descriptions
+        # Test setting multiple column descriptions
         sample_super_df.super.set_column_descriptions({
             'mixed_col': 'Mixed types column',
             'date_col': 'Date column'
@@ -100,7 +100,7 @@ class TestSchemaAndLLMFormat:
     
     def test_schema_generation(self, sample_super_df):
         """Test schema generation"""
-        schema = sample_super_df.super.schema()
+        schema = sample_super_df.super.get_schema()
         
         # Check that schema contains key information
         assert "Test DataFrame" in schema
@@ -121,15 +121,15 @@ class TestSchemaAndLLMFormat:
         {columns}
         """
         
-        schema = sample_super_df.super.schema(template=template)
+        schema = sample_super_df.super.get_schema(template=template)
         
         assert "Name: Test DataFrame" in schema
         assert "Desc: A test dataframe with various column types" in schema
         assert "Size: (5, 7)" in schema or f"Size: {sample_super_df.shape}" in schema
     
-    def test_to_llm_format_json(self, sample_super_df):
-        """Test JSON format for LLMs"""
-        json_str = sample_super_df.super.to_llm_format(format_type='json')
+    def test_schema_json_format(self, sample_super_df):
+        """Test JSON format for schema"""
+        json_str = sample_super_df.super.get_schema(format_type='json')
         data = json.loads(json_str)
         
         # Check structure
@@ -146,9 +146,9 @@ class TestSchemaAndLLMFormat:
         assert isinstance(data['data'], list)
         assert len(data['data']) == 5  # All rows should be included as we have only 5
     
-    def test_to_llm_format_markdown(self, sample_super_df):
-        """Test Markdown format for LLMs"""
-        md = sample_super_df.super.to_llm_format(format_type='markdown')
+    def test_schema_markdown_format(self, sample_super_df):
+        """Test Markdown format for schema"""
+        md = sample_super_df.super.get_schema(format_type='markdown')
         
         assert "# DataFrame: Test DataFrame" in md
         assert "**Description**: A test dataframe with various column types" in md
@@ -156,19 +156,19 @@ class TestSchemaAndLLMFormat:
         assert "## Data Sample" in md
         assert "int_col" in md
     
-    def test_to_llm_format_text(self, sample_super_df):
-        """Test text format for LLMs"""
-        text = sample_super_df.super.to_llm_format(format_type='text')
+    def test_schema_text_format(self, sample_super_df):
+        """Test text format for schema"""
+        text = sample_super_df.super.get_schema(format_type='text')
         
-        assert "DataFrame: Test DataFrame" in text
+        assert "DataFrame Name: Test DataFrame" in text
         assert "Description: A test dataframe with various column types" in text
         assert "Columns:" in text
         assert "Data Sample:" in text
     
-    def test_to_llm_format_invalid(self, sample_super_df):
+    def test_schema_invalid_format(self, sample_super_df):
         """Test invalid format type"""
         with pytest.raises(ValueError):
-            sample_super_df.super.to_llm_format(format_type='invalid_format')
+            sample_super_df.super.get_schema(format_type='invalid_format')
 
 class TestDataFrameOperations:
     """Test pandas operations with super metadata"""
@@ -180,7 +180,7 @@ class TestDataFrameOperations:
         assert 'super' in copied.attrs
         assert copied.super.name == sample_super_df.super.name
         assert copied.super.description == sample_super_df.super.description
-        assert copied.super.column_descriptions == sample_super_df.super.column_descriptions
+        assert copied.super.get_column_descriptions() == sample_super_df.super.get_column_descriptions()
         
         # Modify the copy and check that original is unchanged
         copied.super.name = "Modified Copy"
@@ -260,8 +260,8 @@ class TestSuperDataFrameIO:
     #     assert 'super' in loaded_df.attrs
     #     assert loaded_df.super.name == "JSON Test"
     #     assert loaded_df.super.description == "Test JSON file"
-    #     assert loaded_df.super.get_column_description('A') == 'Numbers'
-    #     assert loaded_df.super.get_column_description('B') == 'Letters'
+    #     assert loaded_df.super.column_descriptions['A'] == 'Numbers'
+    #     assert loaded_df.super.column_descriptions['B'] == 'Letters'
     #     assert list(loaded_df.columns) == ['A', 'B']
     #     pd.testing.assert_frame_equal(pd.DataFrame(original_df), pd.DataFrame(loaded_df))
     
@@ -292,79 +292,68 @@ class TestSuperDataFrameIO:
         pd.testing.assert_frame_equal(pd.DataFrame(original_df), pd.DataFrame(loaded_df)) 
 
 class TestAutoDescribe:
-    """Test auto_describe functionality"""
+    """Test auto-describe functionality"""
     
     def test_auto_describe_with_config(self, sample_df):
-        """Test auto_describe using config settings"""
-        from superpandas import create_super_dataframe
-        
-        # Create test DataFrame with super accessor
+        """Test auto_describe with config settings"""
         df = create_super_dataframe(sample_df)
         
-        # Configure global settings
-        config.configure_llm(
-            model=DummyLLMClient(),
-            existing_values='warn'
+        # Configure LLM settings
+        test_config = SuperPandasConfig()
+        test_config.model = DummyLLMClient()
+        
+        # Test auto_describe
+        df.super.auto_describe(
+            config=test_config,
+            generate_name=True,
+            generate_description=True,
+            generate_column_descriptions=True
         )
         
-        # Test with default config settings
-        df.super.auto_describe()
-        
-        # Test with override
-        df.super.auto_describe(existing_values='overwrite')
-        
-        # Test with existing values
-        df.super.name = "Existing Name"
-        df.super.description = "Existing Description"
-        df.super.set_column_descriptions({'int_col': 'Existing description'})
-        
-        # Should warn but not overwrite with default settings
-        with pytest.warns(UserWarning):
-            df.super.auto_describe()
-        assert df.super.name == "Existing Name"
-        
-        # Should skip silently
-        df.super.auto_describe(existing_values='skip')
-        assert df.super.name == "Existing Name"
-        
-        # Should overwrite
-        df.super.auto_describe(existing_values='overwrite')
-        assert df.super.name != "Existing Name"
-
+        assert df.super.name != ''
+        assert df.super.description != ''
+        assert len(df.super.get_column_descriptions()) > 0
+    
     def test_auto_describe_partial_metadata(self, sample_df):
-        """Test auto_describe with partial existing metadata"""
-        from superpandas import create_super_dataframe
+        """Test auto_describe with partial metadata"""
+        df = create_super_dataframe(
+            sample_df,
+            name="Test DF",
+            description="",
+            column_descriptions={}
+        )
         
-        df = create_super_dataframe(sample_df)
+        # Configure LLM settings
+        test_config = SuperPandasConfig()
+        test_config.model = DummyLLMClient()
         
-        # Set some metadata but leave others empty
-        df.super.name = "Existing Name"
-        # Leave description empty
-        df.super.set_column_descriptions({'int_col': 'Integer column'})
+        # Test auto_describe
+        df.super.auto_describe(
+            config=test_config,
+            generate_description=True,
+            generate_column_descriptions=True
+        )
         
-        # Configure to skip existing values
-        config.configure_llm(existing_values='skip',
-                             model=DummyLLMClient())
-        
-        # Should only generate missing metadata
-        df.super.auto_describe()
-        
-        assert df.super.name == "Existing Name"  # Should not change
-        assert df.super.description != ""  # Should be generated
-        assert df.super.get_column_description('int_col') == 'Integer column'  # Should not change
-        assert df.super.get_column_description('float_col') != ""  # Should be generated
-
+        assert df.super.name == "Test DF"  # Should not change
+        assert df.super.description != ''  # Should be generated
+        assert len(df.super.get_column_descriptions()) > 0  # Should be generated
+    
     def test_auto_describe_empty_dataframe(self):
-        """Test auto_describe with empty DataFrame"""
-        import pandas as pd
-        from superpandas import create_super_dataframe
-        
-        # Create empty DataFrame
+        """Test auto_describe with empty dataframe"""
         df = create_super_dataframe(pd.DataFrame())
         
-        # Should handle empty DataFrame gracefully
-        df.super.auto_describe()
+        # Configure LLM settings
+        test_config = SuperPandasConfig()
+        test_config.model = DummyLLMClient()
         
-        assert isinstance(df.super.name, str)
-        assert isinstance(df.super.description, str)
-        assert isinstance(df.super.column_descriptions, dict) 
+        # Test auto_describe
+        df.super.auto_describe(
+            config=test_config,
+            generate_name=True,
+            generate_description=True,
+            generate_column_descriptions=True
+        )
+        
+        assert df.super.name != ''
+        assert df.super.description != ''
+        assert len(df.super.get_column_descriptions()) == 0  # No columns to describe 

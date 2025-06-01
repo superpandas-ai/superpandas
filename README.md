@@ -1,16 +1,30 @@
 # SuperPandas
 
-SuperPandas is a Python package that extends the well known Pandas library with functionality to allow for AI-powered data analytics. It uses Pandas Dataframe [accessors](https://pandas.pydata.org/docs/development/extending.html) to add namespace 'super' which adds metadata to dataframes for use with LLMs. 
+<div align="center">
+  <img src="https://avatars.githubusercontent.com/u/192782649" alt="SuperPandas Logo" width="200"/>
+</div>
+
+<div align="center">
+  <strong>⚠️ Beta Version - Breaking Changes Expected</strong><br>
+  This package is currently in beta. Please expect errors and breaking changes in future releases.
+</div>
+
+
+### Introduction
+
+SuperPandas is a lightweight Python package that extends the well known Pandas library with functionality for AI-powered data analytics. It is a barebones wrapper using Pandas Dataframe [accessors](https://pandas.pydata.org/docs/development/extending.html) feature to add namespace 'super' which adds metadata and methods to dataframes for use with LLMs. 
 
 ## Key Features
 
 ### Enhanced DataFrame with Metadata
 - **Rich Metadata Support**: Add names, descriptions, and detailed column information to Pandas DataFrames, which allows for better representation of Pandas DataFrames in LLM applications.
-- **Automatically generate metadata**: Automatically generate metadata for DataFrames using LLMs from various providers like OpenAI, Hugging Face, and more.
-- **Intelligent Type Inference**: Automatically detects and tracks detailed column types, especially for object columns.
+- **Automatically generate metadata**: Automatically generate metadata for DataFrames using LLMs.
+- **Support for multiple LLM providers** Support for multiple LLM providers using `smolagents` library
+- **Intelligent Type Inference**: Automatically extracts detailed column types, especially for object columns. (e.g use str instead of object)
 - **Schema Generation**: Generate clear schema representations for using as context in LLM applications.
 - **Serialization**: Save and load DataFrames with all metadata intact.
 - **Drop-in replacement for Pandas DataFrames**: SuperPandas is a lightweight wrapper around pandas DataFrames, so you can use it as a drop-in replacement for your existing code.
+- **Templated Prompt Generation** Easily store and use templates for system and user prompts.
 
 ## Installation
 
@@ -31,7 +45,6 @@ pip install git+https://github.com/superpandas-ai/superpandas.git
 ### Creating SuperDataFrame
 
 ```python
-import superpandas as spd
 import pandas as pd
 import numpy as np
 
@@ -43,14 +56,10 @@ df = pd.DataFrame({
     'units_sold': np.random.randint(100, 1000, 6)
 })
 
-# Method 1: Since superpandas has been imported, the variable 'df' already has 'super' namespace
-print(df.super.name) # yields empty string
-print(df.super.column_types=) # produces a dict of column names and data types ('object' data type is converted to more finegraned datatype)
-df.super.name="sales data"
-print(df.super.name) # prints 'sales data'
+# Method 1: Create a SuperDataFrame explicitly with metadata
+import superpandas as spd
 
-# Method 2: Create a SuperDataFrame explicitly with metadata
-sdf = spd.create_super_dataframe(df, 
+sdf = spd.create_super_dataframe(df,
     name="sales_data",
     description="Monthly sales data by region",
     column_descriptions={
@@ -61,123 +70,63 @@ sdf = spd.create_super_dataframe(df,
 
 # Access metadata
 print(sdf.super.name)  # "sales_data"
-print(sdf.super.description)
-print(sdf.super.column_descriptions)
-print(sdf.super.column_types)  # Shows refined type information. Same as above
+print(sdf.super.description) # 'Monthly sales data by region'
+print(sdf.super.get_column_descriptions())
+print(sdf.super.column_types)  # Shows refined type information
 ```
 
-### LLM Integration
-- **Built-in LLM Support**: Seamless integration with various LLM providers using the `smolagents` package.
-- **Automated Analysis**: Get AI-powered insights about your data.
-- **Auto-Documentation**: Generate descriptions and documentation automatically.
-- **Flexible Provider System**: Support for multiple LLM providers through the unified `smolagents` interface.
-
 ```python
-from superpandas import LLMClient
+# Method 2: Explicitly add metadata
+import superpandas # adds 'super' namespace to pandas without changing existing code
 
-# Initialize LLM client
-llm = LLMClient(model="meta-llama/Llama-3.2-3B-Instruct")
+# Using df from above
+print(df.super.name) # yields empty string
+df.super.name = "sales data"
+df.super.description = "Monthly sales data by region"
+df.super.set_column_descriptions({
+    "revenue": "Monthly revenue in USD",
+    "region": "Sales region code"
+})
+print(df.super.name) # prints 'sales data'
+print(df.super.description) # 'Monthly sales data by region'
+print(df.super.get_column_descriptions())
+print(df.super.column_types) # produces a dict of column names and data types ('object' data type is converted to more finegraned datatype)
+```
 
-# Generate individual components
-df_name = llm.generate_df_name(df)
-df_description = llm.generate_df_description(df)
-column_descriptions = llm.generate_column_descriptions(df)
+### Core Methods
 
-# Auto-describe your DataFrame
-sdf.super.auto_describe(
-    model="meta-llama/Llama-3.2-3B-Instruct",
-    generate_name=True,
-    generate_description=True,
-    generate_column_descriptions=True
+#### Metadata Management
+```python
+# Get/Set DataFrame name and description
+df.super.name = "my_dataframe"
+df.super.description = "Description of my dataframe"
+
+# Get/Set column descriptions
+df.super.set_column_description("column_name", "Description of column")
+df.super.set_column_descriptions({
+    "col1": "Description 1",
+    "col2": "Description 2"
+}, errors='raise')  # errors can be 'raise', 'ignore', or 'warn'
+
+# Get column information
+description = df.super.get_column_description("column_name")
+all_descriptions = df.super.get_column_descriptions()
+column_types = df.super.column_types
+
+# Refresh column type inference
+df.super.refresh_column_types()
+```
+
+#### Schema Generation
+```python
+# Generate schema in different formats
+schema = df.super.get_schema(
+    template=None,  # Optional custom template
+    format_type='text',  # Options: 'json', 'markdown', 'text', 'yaml'
+    max_rows=5  # Number of sample rows to include
 )
 
-# Get AI analysis
-analysis = sdf.query("What are the key trends in this data?")
-```
-
-### Enhanced Serialization
-- **Metadata Preservation**: Save and load DataFrames with all metadata intact.
-- **Multiple Format Support**: Export to CSV and pickle with metadata. (JSON format coming soon)
-- **Backwards Compatibility**: Works seamlessly with standard pandas operations. (#TODO: Merge operation)
-
-```python
-# Save with metadata
-df.super.to_csv("data.csv", include_metadata=True, index=False)
-df.super.to_pickle("data.pkl")
-
-# Load with metadata
-df = spd.read_csv("data.csv", require_metadata=True)
-df = spd.read_pickle("data.pkl")
-```
-
-### LLM Provider Support
-SuperPandas supports multiple LLM providers through the `smolagents` package:
-
-- OpenAI API (`OpenAIServerModel`)
-- Hugging Face API (`HfApiModel`)
-- LiteLLM (`LiteLLMModel`)
-- Azure OpenAI (`AzureOpenAIServerModel`)
-- VLLM (`VLLMModel`)
-- MLX (`MLXModel`)
-- Local Transformers (`TransformersModel`)
-- Custom model implementations
-
-```python
-# List available providers
-providers = LLMClient.available_providers()
-print(providers.keys())
-
-# Use specific provider
-llm = LLMClient(
-    model="gpt-3.5-turbo",
-    provider_class=providers['OpenAIServerModel']
-)
-
-# Use default provider (Hugging Face with Llama 3.2)
-llm = LLMClient()
-```
-
-### Auto-Documentation Features
-
-The LLMClient provides several methods for automatic documentation:
-
-```python
-# Generate comprehensive DataFrame description
-df_description = llm.generate_df_description(df)
-
-# Generate column-level descriptions
-column_descriptions = llm.generate_column_descriptions(df)
-
-# Generate a concise name for the DataFrame
-df_name = llm.generate_df_name(df)
-
-# Automatically generate all metadata at once
-df.super.auto_describe(
-    model="meta-llama/Llama-3.2-3B-Instruct",
-    generate_name=True,
-    generate_description=True,
-    generate_column_descriptions=True
-)
-```
-
-### Custom LLM Integration
-
-You can create custom LLM clients by extending the base `LLMClient` class:
-
-```python
-from superpandas import LLMClient
-
-class CustomLLMClient(LLMClient):
-    def query(self, prompt: str, **kwargs) -> str:
-        # Implement custom query logic
-        return your_custom_logic(prompt)
-```
-
-## Advanced Usage
-
-### Custom Schema Templates
-```python
-# Define custom schema template
+# Custom schema template
 template = """
 # {name}
 {description}
@@ -189,37 +138,113 @@ Columns: {shape[1]}
 ## Columns
 {columns}
 """
-
-# Generate schema with custom template
-schema = df.super.schema(template=template)
+schema = df.super.get_schema(template=template)
 ```
 
-### LLM Format Options
+### LLM Integration
+
+SuperPandas supports multiple LLM providers through the `smolagents` package:
+
+- OpenAI API (`OpenAIServerModel`)
+- Hugging Face API (`HfApiModel`)
+- LiteLLM (`LiteLLMModel`)
+- Azure OpenAI (`AzureOpenAIServerModel`)
+- VLLM (`VLLMModel`)
+- MLX (`MLXModel`)
+- Local Transformers (`TransformersModel`)
+
 ```python
-# Convert to LLM-friendly formats
-json_format = df.super.to_llm_format(format_type='json')
-markdown_format = df.super.to_llm_format(format_type='markdown')
-text_format = df.super.to_llm_format(format_type='text')
-```
+from superpandas import SuperPandasConfig, LLMClient
+# List available providers
+providers = LLMClient.available_providers()
+print(providers.keys())
 
-### Queries on your Pandas dataframe
+# Initialize LLM config
+config = SuperPandasConfig()
+config.provider = 'HfApiModel'  # Available providers: LiteLLMModel, OpenAIServerModel, HfApiModel, TransformersModel, VLLMModel, MLXModel, AzureOpenAIServerModel
+config.model = "meta-llama/Llama-3.2-3B-Instruct"
 
-Ask questions about your dataframe.
+# Configure at the DataFrame level
+df.super.config = config
 
-```python
-# Basic dataframe analysis
-analysis = sdf.query("What are the key trends in this data?")
+# Access and configure the LLM client directly
+df.super.llm_client = LLMClient(
+    model="gpt-3.5-turbo",
+    provider=providers['OpenAIServerModel']
+)
 
-# Custom analysis with additional parameters
+# Auto-describe your DataFrame
+df.super.auto_describe(
+    config=None,  # Optional SuperPandasConfig instance
+    generate_name=True,
+    generate_description=True,
+    generate_column_descriptions=True,
+    existing_values='warn',  # Options: 'warn', 'skip', 'overwrite'
+    **model_kwargs  # Additional arguments for the model provider
+)
 
-llm = LLMClient()
-analysis = llm.analyze_dataframe(
-    sdf,
-    "Identify outliers in the sales data",
-    temperature=0.7,
-    max_tokens=500
+# Query the DataFrame
+response = df.super.query(
+    "What are the key trends in this data?",
+    system_template=None,  # Optional custom system template
+    user_template=None  # Optional custom user template
 )
 ```
+
+### Serialization
+
+#### CSV with Metadata
+```python
+# Save with metadata
+df.super.to_csv("data.csv", include_metadata=True, index=False)
+# This will save all the metadata into a file data_metadata.json alongwith the actual data in data.csv.
+
+# Load with metadata (Note it overloads pandas read_csv instead)
+df = spd.read_csv("data.csv", include_metadata=True)  # Raises FileNotFoundError if metadata not found
+df = spd.read_csv("data.csv", include_metadata=False)  # Initializes empty metadata if not found
+
+# Read metadata separately
+df.super.read_metadata("data.csv")
+```
+#### Pickle
+```python
+# Save to pickle
+df.super.to_pickle("data.pkl")
+
+# Read from pickle
+df = spd.read_pickle("data.pkl")
+```
+
+### Configuration
+
+The `SuperPandasConfig` class manages global configuration settings:
+
+```python
+config = SuperPandasConfig()
+
+# Available settings
+config.provider = 'HfApiModel'  # LLM provider
+config.model = "meta-llama/Llama-3.2-3B-Instruct"  # Model name
+config.llm_kwargs = {'existing_values': 'warn'}  # Additional LLM arguments
+config.system_template = "..."  # System prompt template
+config.user_template = "..."  # User prompt template
+
+# Save/load configuration
+config.save()  # Saves to ~/.cache/superpandas/config.json
+config.load()  # Loads from default path
+```
+
+### Error Handling
+
+- Column description methods (`set_column_description`, `set_column_descriptions`) support error handling options:
+  - `'raise'`: Raise ValueError for non-existent columns (default)
+  - `'ignore'`: Silently skip non-existent columns
+  - `'warn'`: Warn and skip non-existent columns
+
+- CSV reading with metadata:
+  - `include_metadata=True`: Raises FileNotFoundError if metadata file not found
+  - `include_metadata=False`: Initializes empty metadata if metadata file not found
+
 ## Future Features / Roadmap
 
 *   **Core DataFrame Enhancements:**
@@ -252,4 +277,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Documentation
 
 For more detailed information on SuperPandas, please refer to the [API documentation (Work in Progress)](https://superpandas.readthedocs.io/en/latest/).
+
 

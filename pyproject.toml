@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "superpandas"
-version = "0.2.1"
+version = "0.3.1"
 description = "Lightweight wrapper around Pandas to add AI capabilities"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -15,6 +15,7 @@ authors = [
 dependencies = [
     "pandas>=1.0.0",
     "numpy>=1.20.0",
+    "smolagents>=0.1.0",
 ]
 
 [project.optional-dependencies]
