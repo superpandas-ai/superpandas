@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "superpandas"
+version = "0.2.1"
+description = "Lightweight wrapper around Pandas to add AI capabilities"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Haris Jabbar", email = "haris@superpandas.ai"},
+]
+dependencies = [
+    "pandas>=1.0.0",
+    "numpy>=1.20.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=superpandas"
+
+[tool.hatch.build.targets.wheel]
+packages = ["superpandas"] 
