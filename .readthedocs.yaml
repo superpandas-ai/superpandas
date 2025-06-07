@@ -21,7 +21,7 @@ formats:
 
 # Build documentation in the following branches
 branches:
-  - main
+  - master
   - latest
   - stable
 
