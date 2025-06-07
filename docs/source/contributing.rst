@@ -1,5 +1,5 @@
 Contributing to SuperPandas
-==========================
+============================
 
 We love your input! We want to make contributing to SuperPandas as easy and transparent as possible, whether it's:
 
@@ -10,7 +10,7 @@ We love your input! We want to make contributing to SuperPandas as easy and tran
 - Becoming a maintainer
 
 Development Process
-------------------
+-------------------
 
 We use GitHub to host code, to track issues and feature requests, as well as accept pull requests.
 
@@ -22,24 +22,24 @@ We use GitHub to host code, to track issues and feature requests, as well as acc
 6. Issue that pull request!
 
 Pull Request Process
--------------------
+--------------------
 
 1. Update the README.md with details of changes to the interface, if applicable
 2. Update the docs/ with any necessary documentation changes
 3. The PR will be merged once you have the sign-off of at least one other developer
 
 Any contributions you make will be under the MIT Software License
---------------------------------------------------------------
+------------------------------------------------------------------
 
 In short, when you submit code changes, your submissions are understood to be under the same `MIT License <http://choosealicense.com/licenses/mit/>`_ that covers the project. Feel free to contact the maintainers if that's a concern.
 
-Report bugs using GitHub's `issue tracker <https://github.com/superpandas-ai/superpandas/issues>`_
--------------------------------------------------------------------------------------------
+Report bugs using GitHub's issue tracker
+----------------------------------------
 
 We use GitHub issues to track public bugs. Report a bug by `opening a new issue <https://github.com/superpandas-ai/superpandas/issues/new>`_; it's that easy!
 
 Write bug reports with detail, background, and sample code
---------------------------------------------------------
+----------------------------------------------------------
 
 **Great Bug Reports** tend to have:
 
@@ -52,44 +52,49 @@ Write bug reports with detail, background, and sample code
 - Notes (possibly including why you think this might be happening, or stuff you tried that didn't work)
 
 Development Setup
-----------------
+-----------------
 
 1. Clone the repository:
+
    .. code-block:: bash
 
       git clone https://github.com/superpandas-ai/superpandas.git
       cd superpandas
 
 2. Create a virtual environment:
+
    .. code-block:: bash
 
       python -m venv venv
       source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 3. Install development dependencies:
+
    .. code-block:: bash
 
       pip install -e ".[dev]"
       pip install -r requirements-docs.txt
 
 4. Run tests:
+
    .. code-block:: bash
 
       pytest
 
 5. Build documentation:
+
    .. code-block:: bash
 
       cd docs
       make html
 
 Code Style
-----------
+-----------
 
 We use `black <https://github.com/psf/black>`_ for code formatting and `flake8 <https://flake8.pycqa.org/>`_ for linting. Please ensure your code follows these style guidelines.
 
 Development Guidelines
---------------------
+----------------------
 
 1. **Code Style**:
    - Use black for code formatting
@@ -122,11 +127,11 @@ Development Guidelines
    - Request review from maintainers
 
 Documentation
-------------
+-------------
 
 We use Sphinx for documentation. When adding new features or changing existing ones, please update the documentation accordingly. The documentation is built automatically on ReadTheDocs.
 
 License
--------
+--------
 
 By contributing, you agree that your contributions will be licensed under its MIT License. 

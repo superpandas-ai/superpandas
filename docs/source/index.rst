@@ -12,7 +12,7 @@
 Welcome to SuperPandas's documentation!
 ========================================
 
-SuperPandas is a lightweight Python package that extends the well known Pandas library with functionality for AI-powered data analytics. It is a barebones wrapper using Pandas Dataframe [accessors](https://pandas.pydata.org/docs/development/extending.html) feature to add namespace 'super' which adds metadata and methods to dataframes for use with LLMs.
+SuperPandas is a lightweight Python package that extends the well known Pandas library with functionality for AI-powered data analytics. It is a barebones wrapper using Pandas Dataframe `accessors <https://pandas.pydata.org/docs/development/extending.html>`_ feature to add namespace 'super' which adds metadata and methods to dataframes for use with LLMs.
 
 Key Goals:
 -----------

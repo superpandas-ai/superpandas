@@ -137,6 +137,7 @@ LLM Integration
 SuperPandas integrates with various LLM providers via the `smolagents` package.
 
 Supported providers include:
+
 - OpenAI API (`OpenAIServerModel`)
 - Hugging Face API (`HfApiModel`)
 - LiteLLM (`LiteLLMModel`)
