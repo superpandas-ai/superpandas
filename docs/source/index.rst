@@ -3,6 +3,12 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+.. image:: _static/spd_logo.png
+   :alt: SuperPandas Logo
+   :align: center
+   :width: 200px
+
+
 Welcome to SuperPandas's documentation!
 ========================================
 
