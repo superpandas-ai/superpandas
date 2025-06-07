@@ -1,0 +1,5 @@
+sphinx
+sphinx-rtd-theme
+pandas>=1.0.0
+numpy>=1.20.0
+smolagents>=0.1.0

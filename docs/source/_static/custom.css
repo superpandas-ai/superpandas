@@ -1,0 +1,28 @@
+/* Custom styles for SuperPandas documentation */
+
+/* Make code blocks more readable */
+.highlight {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 1em;
+}
+
+/* Style for important notes */
+.admonition.important {
+    border-left-color: #007bff;
+}
+
+/* Style for API documentation */
+dl.class, dl.function, dl.method {
+    margin-bottom: 2em;
+}
+
+/* Style for parameter lists */
+.field-list {
+    margin-top: 1em;
+}
+
+/* Style for navigation */
+.wy-nav-side {
+    background: #343131;
+} 

@@ -52,7 +52,7 @@ class TestSerialization:
         # Check metadata
         assert loaded_df.super.name == sample_df.super.name
         assert loaded_df.super.description == sample_df.super.description
-        assert loaded_df.super.get_column_descriptions() == sample_df.super.get_column_descriptions()
+        assert loaded_df.super.column_descriptions == sample_df.super.column_descriptions
         assert loaded_df.super.column_types == sample_df.super.column_types
 
     def test_csv_serialization(self, sample_df, temp_dir):
@@ -77,7 +77,7 @@ class TestSerialization:
         # Check metadata
         assert loaded_df.super.name == sample_df.super.name
         assert loaded_df.super.description == sample_df.super.description
-        assert loaded_df.super.get_column_descriptions() == sample_df.super.get_column_descriptions()
+        assert loaded_df.super.column_descriptions == sample_df.super.column_descriptions
         assert loaded_df.super.column_types == sample_df.super.column_types
 
     def test_csv_serialization_no_metadata(self, sample_df, temp_dir):
@@ -106,7 +106,7 @@ class TestSerialization:
         # Check metadata is empty/default
         assert loaded_df.super.name == ''
         assert loaded_df.super.description == ''
-        assert loaded_df.super.get_column_descriptions() == {}
+        assert loaded_df.super.column_descriptions == {}
         assert isinstance(loaded_df.super.column_types, dict)
 
     # def test_edge_cases(self, temp_dir):
@@ -138,7 +138,7 @@ class TestSerialization:
     #     # Check metadata
     #     assert loaded_df.super.name == df.super.name
     #     assert loaded_df.super.description == df.super.description
-    #     assert loaded_df.super.get_column_descriptions() == df.super.get_column_descriptions()
+    #     assert loaded_df.super.column_descriptions == df.super.column_descriptions
     #     assert loaded_df.super.column_types == df.super.column_types
     
 
@@ -194,7 +194,7 @@ class TestSerialization:
         assert 'super' in loaded_df.attrs
         assert loaded_df.super.name == "Test DF"
         assert loaded_df.super.description == "Test description"
-        assert loaded_df.super.get_column_descriptions() == df.super.get_column_descriptions()
+        assert loaded_df.super.column_descriptions == df.super.column_descriptions
         assert list(loaded_df.columns) == ['A', 'B']
         pd.testing.assert_frame_equal(pd.DataFrame(df), pd.DataFrame(loaded_df))
 
@@ -212,12 +212,71 @@ class TestSerialization:
         df.super.to_pickle(pickle_path)
         
         # Read it back
-        loaded_df = pd.read_pickle(pickle_path)
+        loaded_df = spd.read_pickle(pickle_path)
         
         # Verify data and metadata
         assert 'super' in loaded_df.attrs
         assert loaded_df.super.name == "Test DF"
         assert loaded_df.super.description == "Test description"
-        assert loaded_df.super.get_column_descriptions() == {}
+        assert loaded_df.super.column_descriptions == {'A': '', 'B': ''}
         assert list(loaded_df.columns) == ['A', 'B']
-        pd.testing.assert_frame_equal(pd.DataFrame(df), pd.DataFrame(loaded_df)) 
+        pd.testing.assert_frame_equal(pd.DataFrame(df), pd.DataFrame(loaded_df))
+
+    def test_read_pickle_with_metadata(self, sample_df, temp_dir):
+        """Test reading a pickle file with existing metadata"""
+        # Save to pickle
+        pickle_path = temp_dir / 'test.pkl'
+        sample_df.super.to_pickle(pickle_path)
+        
+        # Read using the new read_pickle function
+        loaded_df = spd.read_pickle(pickle_path)
+        
+        # Check data equality
+        pd.testing.assert_frame_equal(pd.DataFrame(sample_df), pd.DataFrame(loaded_df))
+        
+        # Check metadata
+        assert loaded_df.super.name == sample_df.super.name
+        assert loaded_df.super.description == sample_df.super.description
+        assert loaded_df.super.column_descriptions == sample_df.super.column_descriptions
+        assert loaded_df.super.column_types == sample_df.super.column_types
+
+    def test_read_pickle_without_metadata(self, temp_dir):
+        """Test reading a pickle file without metadata"""
+        # Create a regular pandas DataFrame without metadata
+        df = pd.DataFrame({'A': [1, 2, 3], 'B': ['x', 'y', 'z']})
+        
+        # Save to pickle
+        pickle_path = temp_dir / 'test.pkl'
+        df.to_pickle(pickle_path)
+        
+        # Read using the new read_pickle function
+        loaded_df = spd.read_pickle(pickle_path)
+        
+        # Check data equality
+        pd.testing.assert_frame_equal(df, loaded_df)
+        
+        # Check that metadata was initialized
+        assert 'super' in loaded_df.attrs
+        assert loaded_df.super.name == ''
+        assert loaded_df.super.description == ''
+        assert loaded_df.super.column_descriptions == {'A': '', 'B': ''}
+        assert loaded_df.super.column_types == {'A': 'int64', 'B': 'str'}
+
+    # def test_read_pickle_invalid_format(self, temp_dir): # TODO: Check it later
+    #     """Test reading a pickle file with invalid format"""
+    #     # Create invalid data
+    #     invalid_data = {'invalid': 'data'}
+        
+    #     # Save invalid data to pickle
+    #     pickle_path = temp_dir / 'test.pkl'
+    #     pd.to_pickle(invalid_data, pickle_path)
+        
+    #     # Test that reading invalid format raises ValueError
+    #     with pytest.raises(ValueError, match="Invalid pickle file format"):
+    #         spd.read_pickle(pickle_path)
+
+    def test_read_pickle_nonexistent_file(self, temp_dir):
+        """Test reading a non-existent pickle file"""
+        # Test that reading non-existent file raises FileNotFoundError
+        with pytest.raises(FileNotFoundError):
+            spd.read_pickle(temp_dir / 'nonexistent.pkl') 

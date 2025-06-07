@@ -45,7 +45,7 @@ class TestSuperDataFrameBasics:
         # Test getters
         assert sample_super_df.super.name == "Test DataFrame"
         assert sample_super_df.super.description == "A test dataframe with various column types"
-        assert sample_super_df.super.get_column_description('int_col') == 'Integer column'
+        assert sample_super_df.super.column_descriptions['int_col'] == 'Integer column'
         
         # Test setters
         sample_super_df.super.name = "Updated Name"
@@ -55,18 +55,46 @@ class TestSuperDataFrameBasics:
         assert sample_super_df.super.name == "Updated Name"
         assert sample_super_df.super.description == "Updated description"
         assert sample_super_df.super.get_column_description('bool_col') == 'Boolean column'
+        assert sample_super_df.super.column_descriptions['bool_col'] == 'Boolean column'
         
-        # Test setting multiple column descriptions
-        sample_super_df.super.set_column_descriptions({
+        # Test column_descriptions property
+        descriptions = sample_super_df.super.column_descriptions
+        assert isinstance(descriptions, dict)
+        assert descriptions['int_col'] == 'Integer column'
+        assert descriptions['bool_col'] == 'Boolean column'
+        
+        # Test setting column_descriptions property
+        new_descriptions = {
             'mixed_col': 'Mixed types column',
             'date_col': 'Date column'
-        })
+        }
+        sample_super_df.super.set_column_descriptions(new_descriptions)
         assert sample_super_df.super.get_column_description('mixed_col') == 'Mixed types column'
         assert sample_super_df.super.get_column_description('date_col') == 'Date column'
         
         # Test error on non-existent column
         with pytest.raises(ValueError):
-            sample_super_df.super.set_column_description('non_existent', 'This should fail')
+            sample_super_df.super.set_column_descriptions({'non_existent': 'This should fail'})
+            
+        # Test set_column_descriptions with error handling
+        # Test 'raise' (default)
+        with pytest.raises(ValueError):
+            sample_super_df.super.set_column_descriptions({'non_existent': 'This should fail'})
+            
+        # Test 'ignore'
+        sample_super_df.super.set_column_descriptions(
+            {'non_existent': 'This should be ignored'},
+            errors='ignore'
+        )
+        assert 'non_existent' not in sample_super_df.super.column_descriptions
+        
+        # Test 'warn'
+        with pytest.warns(UserWarning, match="Column 'non_existent' does not exist in the dataframe"):
+            sample_super_df.super.set_column_descriptions(
+                {'non_existent': 'This should warn'},
+                errors='warn'
+            )
+        assert 'non_existent' not in sample_super_df.super.column_descriptions
 
 class TestColumnTypeInference:
     """Test column type inference functionality"""
@@ -180,11 +208,21 @@ class TestDataFrameOperations:
         assert 'super' in copied.attrs
         assert copied.super.name == sample_super_df.super.name
         assert copied.super.description == sample_super_df.super.description
-        assert copied.super.get_column_descriptions() == sample_super_df.super.get_column_descriptions()
+        
+        # Test that column_descriptions returns a copy
+        original_descriptions = sample_super_df.super.column_descriptions
+        copied_descriptions = copied.super.column_descriptions
+        assert original_descriptions == copied_descriptions
+        assert original_descriptions is not copied_descriptions  # Should be different objects
         
         # Modify the copy and check that original is unchanged
         copied.super.name = "Modified Copy"
         assert sample_super_df.super.name == "Test DataFrame"
+        
+        # Modify column descriptions in copy
+        copied.super.set_column_descriptions({'int_col': 'Modified description'})
+        assert sample_super_df.super.column_descriptions['int_col'] == 'Integer column'
+        assert copied.super.column_descriptions['int_col'] == 'Modified description'
     
     def test_basic_operations(self, sample_super_df):
         """Test basic pandas operations preserve super metadata"""
@@ -232,7 +270,7 @@ class TestSuperDataFrameIO:
         loaded_df.super.read_metadata(test_path)  # Load metadata from companion file
         assert loaded_df.super.name == "Titanic Dataset"
         assert loaded_df.super.description == "Passenger data from the Titanic"
-        assert loaded_df.super.get_column_description('Survived') == 'Whether the passenger survived (1) or not (0)'
+        assert loaded_df.super.column_descriptions['Survived'] == 'Whether the passenger survived (1) or not (0)'
         
         # Cleanup
         if os.path.exists(test_path):
@@ -312,7 +350,15 @@ class TestAutoDescribe:
         
         assert df.super.name != ''
         assert df.super.description != ''
-        assert len(df.super.get_column_descriptions()) > 0
+        
+        # Test column_descriptions property
+        descriptions = df.super.column_descriptions
+        assert isinstance(descriptions, dict)
+        assert len(descriptions) > 0
+        
+        # Test that descriptions are properly stored in attrs
+        assert 'column_descriptions' in df.attrs['super']
+        assert df.attrs['super']['column_descriptions'] == descriptions
     
     def test_auto_describe_partial_metadata(self, sample_df):
         """Test auto_describe with partial metadata"""
@@ -336,7 +382,7 @@ class TestAutoDescribe:
         
         assert df.super.name == "Test DF"  # Should not change
         assert df.super.description != ''  # Should be generated
-        assert len(df.super.get_column_descriptions()) > 0  # Should be generated
+        assert len(df.super.column_descriptions) > 0  # Should be generated
     
     def test_auto_describe_empty_dataframe(self):
         """Test auto_describe with empty dataframe"""
@@ -356,4 +402,4 @@ class TestAutoDescribe:
         
         assert df.super.name != ''
         assert df.super.description != ''
-        assert len(df.super.get_column_descriptions()) == 0  # No columns to describe 
+        assert len(df.super.column_descriptions) == 0  # No columns to describe 

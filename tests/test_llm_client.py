@@ -1,5 +1,5 @@
 import pytest
-from superpandas import LLMClient, SuperPandasConfig
+from superpandas import LLMClient, SuperPandasConfig, create_super_dataframe
 from superpandas.llm_client import LLMMessage, LLMResponse, DummyLLMClient
 import pandas as pd
 from unittest.mock import Mock, patch
@@ -120,6 +120,12 @@ class TestLLMClient:
         assert isinstance(col_descriptions, dict)
         assert all(col in col_descriptions for col in sample_df.columns)
         assert all(isinstance(desc, str) for desc in col_descriptions.values())
+        
+        # Test that descriptions can be set via property
+        df = create_super_dataframe(sample_df)
+        df.super.set_column_descriptions(col_descriptions)
+        assert df.super.column_descriptions == col_descriptions
+        assert df.super.column_descriptions is not col_descriptions  # Should be a copy
         
         # Test generate_df_name
         name = client.generate_df_name(sample_df)

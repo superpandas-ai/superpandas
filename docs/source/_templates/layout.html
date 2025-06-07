@@ -1,0 +1,16 @@
+{% extends "!layout.html" %}
+
+{% block extrahead %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ pathto('_static/custom.css', 1) }}" type="text/css" />
+{% endblock %}
+
+{% block menu %}
+    {{ super() }}
+    <p class="caption" role="heading"><span class="caption-text">Additional Links</span></p>
+    <ul>
+        <li class="toctree-l1"><a class="reference internal" href="https://github.com/superpandas-ai/superpandas">GitHub Repository</a></li>
+        <li class="toctree-l1"><a class="reference internal" href="https://pypi.org/project/superpandas/">PyPI Package</a></li>
+        <li class="toctree-l1"><a class="reference internal" href="https://superpandas.readthedocs.io/">Documentation</a></li>
+    </ul>
+{% endblock %} 
