@@ -3,14 +3,8 @@ import sys
 import datetime
 from pathlib import Path
 
-def update_changelog(change_type, description):
-    """
-    Add a new entry to the changelog.
-    
-    Args:
-        change_type (str): Type of change (Added, Changed, Deprecated, Removed, Fixed, Security)
-        description (str): Description of the change
-    """
+def update_markdown_changelog(change_type, description):
+    """Update the Markdown changelog."""
     changelog_path = Path("CHANGELOG.md")
     
     if not changelog_path.exists():
@@ -32,7 +26,41 @@ def update_changelog(change_type, description):
     
     with open(changelog_path, 'w') as f:
         f.write(content)
+
+def update_rst_changelog(change_type, description):
+    """Update the RST changelog."""
+    changelog_path = Path("docs/source/changelog.rst")
     
+    if not changelog_path.exists():
+        print("Error: changelog.rst not found!")
+        sys.exit(1)
+    
+    with open(changelog_path, 'r') as f:
+        content = f.read()
+    
+    # Find the Unreleased section
+    unreleased_section = "[Unreleased]"
+    if unreleased_section not in content:
+        print("Error: Could not find [Unreleased] section in changelog.rst")
+        sys.exit(1)
+    
+    # Add the new entry
+    new_entry = f"\n{change_type}\n~~~~~\n- {description}"
+    content = content.replace(unreleased_section, unreleased_section + new_entry)
+    
+    with open(changelog_path, 'w') as f:
+        f.write(content)
+
+def update_changelog(change_type, description):
+    """
+    Add a new entry to both changelog formats.
+    
+    Args:
+        change_type (str): Type of change (Added, Changed, Deprecated, Removed, Fixed, Security)
+        description (str): Description of the change
+    """
+    update_markdown_changelog(change_type, description)
+    update_rst_changelog(change_type, description)
     print(f"Successfully added changelog entry: {change_type} - {description}")
 
 if __name__ == "__main__":

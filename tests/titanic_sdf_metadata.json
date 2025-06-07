@@ -1,7 +1,14 @@
 {
   "name": "titanic",
   "description": "simple titanic dataset",
-  "column_descriptions": {},
+  "column_descriptions": {
+    "PassengerId": "Passenger ID",
+    "Survived": "Survival",
+    "Name": "Name",
+    "Sex": "Sex",
+    "Age": "Age",
+    "Fare": "Fare"
+  },
   "column_types": {
     "PassengerId": "int64",
     "Survived": "int64",

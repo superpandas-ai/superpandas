@@ -130,13 +130,37 @@ class SuperDataFrameAccessor:
     def column_types(self) -> Dict[str, str]:
         """Get refined column data types"""
         return self._obj.attrs['super']['column_types']
+
+    @property
+    def column_descriptions(self) -> Dict[str, str]:
+        """Get all column descriptions as strings"""
+        return {col: desc for col, desc in self._obj.attrs['super']['column_descriptions'].items()}
     
-    def get_column_descriptions(self) -> Dict[str, str]:
-        """Get all column descriptions"""
-        return self._obj.attrs['super']['column_descriptions'].copy()
+    # @column_descriptions.setter
+    # def column_descriptions(self, column_descriptions: Dict[str, str]):
+    #     """Set descriptions for multiple columns at once
+        
+    #     Parameters:
+    #     -----------
+    #     column_descriptions : dict(str, str)
+    #         A dictionary mapping column names to their descriptions
+            
+    #     Raises:
+    #     -------
+    #     ValueError
+    #         If any column does not exist in the dataframe
+    #     """
+    #     # Validate all columns
+    #     invalid_cols = [col for col in column_descriptions.keys() if col not in self._obj.columns]
+    #     if invalid_cols:
+    #         raise ValueError(f"Columns {invalid_cols} do not exist in the dataframe")
+        
+    #     # Update descriptions
+    #     for column, col_desc in column_descriptions.items():
+    #         self._obj.attrs['super']['column_descriptions'][column] = col_desc
 
     def get_column_description(self, column: str) -> str:
-        """Get description for a specific column
+        """Get description for a specific column as a string
         
         Parameters:
         -----------
@@ -146,7 +170,7 @@ class SuperDataFrameAccessor:
         Returns:
         --------
         str
-            The description of the column
+            The description of the column as a string
             
         Raises:
         -------
@@ -180,31 +204,9 @@ class SuperDataFrameAccessor:
         self._obj.attrs['super']['column_descriptions'][column] = description
 
     def set_column_descriptions(self, column_descriptions: Dict[str, str], errors: Literal['raise', 'ignore', 'warn'] = 'raise'):
-        """Set descriptions for multiple columns at once with error handling options
-        
-        Parameters:
-        -----------
-        column_descriptions : dict(str, str)
-            A dictionary mapping column names to their descriptions
-        errors : str, default 'raise'
-            The error handling option ('raise', 'ignore', 'warn')
-        """
-        # First validate all columns if errors='raise'
-        if errors == 'raise':
-            invalid_cols = [col for col in column_descriptions.keys() if col not in self._obj.columns]
-            if invalid_cols:
-                raise ValueError(f"Columns {invalid_cols} do not exist in the dataframe")
-        
-        # Then process each column
+        """Set descriptions for multiple columns at once with error handling options"""
         for column, description in column_descriptions.items():
-            if column not in self._obj.columns:
-                if errors == 'ignore':
-                    continue
-                elif errors == 'warn':
-                    warnings.warn(f"Column '{column}' does not exist in the dataframe, skipping...")
-                    continue
-            else:
-                self._obj.attrs['super']['column_descriptions'][column] = description
+            self.set_column_description(column, description, errors)
 
     @property
     def system_template(self) -> str:
@@ -254,7 +256,7 @@ class SuperDataFrameAccessor:
         columns_info = []
         for col in self._obj.columns:
             refined_type = self.column_types.get(col, str(self._obj.dtypes[col]))
-            desc = self.get_column_description(col)
+            desc = self.column_descriptions.get(col, '')
             columns_info.append(f"- {col} ({refined_type}): {desc}")
         
         columns_str = "\n".join(columns_info)
@@ -426,21 +428,6 @@ class SuperDataFrameAccessor:
         # Save DataFrame with metadata in attrs
         self._obj.to_pickle(path)
 
-    def read_pickle(self, path: str):
-        """Read DataFrame from pickle with metadata"""
-        df = pd.read_pickle(path)
-        if isinstance(df, pd.DataFrame):
-            if 'super' in df.attrs:
-                self._obj.attrs['super'] = df.attrs['super']
-            else:
-                self._initialize_metadata()
-        elif isinstance(df, dict) and 'dataframe' in df and 'metadata' in df:
-            # Handle legacy format where data was stored as dict
-            self._obj = df['dataframe']
-            self._obj.attrs['super'] = df['metadata']
-        else:
-            self._initialize_metadata()
-
     def to_csv(self, path, include_metadata: bool = True, **kwargs):
         """
         Save DataFrame to CSV with optional metadata in a companion file.
@@ -464,7 +451,7 @@ class SuperDataFrameAccessor:
             metadata = {
                 'name': self._obj.attrs['super']['name'],
                 'description': self._obj.attrs['super']['description'],
-                'column_descriptions': self.get_column_descriptions(),
+                'column_descriptions': self.column_descriptions,
                 'column_types': self.column_types,
                 'dtypes': {col: str(dtype) for col, dtype in self._obj.dtypes.items()}
             }
@@ -550,7 +537,7 @@ class SuperDataFrameAccessor:
             warnings.warn("DataFrame already has a description. Skipping description generation.")
         
         if generate_column_descriptions:
-            existing_cols = {col: desc for col, desc in self.get_column_descriptions().items() if desc}
+            existing_cols = {col: desc for col, desc in self.column_descriptions.items() if desc}
             if existing_cols and existing_values != 'overwrite':
                 if existing_values == 'warn':
                     warnings.warn(f"Some columns already have descriptions: {list(existing_cols.keys())}. "
@@ -575,7 +562,7 @@ class SuperDataFrameAccessor:
         return (f"SuperDataFrameAccessor("
                 f"name={self.name}, "
                 f"description={self.description}, "
-                f"column_descriptions={self.get_column_descriptions()}, "
+                f"column_descriptions={self.column_descriptions}, "
                 f"column_types={self.column_types})")
 
     def __repr__(self):
@@ -646,6 +633,42 @@ class SuperDataFrameAccessor:
         """Set the LLM client instance."""
         self._llm_client = client
 
+def read_pickle(path: str) -> pd.DataFrame:
+    """
+    Read a DataFrame from pickle with super accessor metadata.
+    
+    Parameters:
+    -----------
+    path : str
+        Path to the pickle file
+        
+    Returns:
+    --------
+    pd.DataFrame
+        DataFrame with initialized super accessor metadata
+        
+    Examples:
+    --------
+    >>> import superpandas as spd
+    >>> # Read pickle with metadata
+    >>> df = spd.read_pickle('data.pkl')
+    """
+    try:
+        df = pd.read_pickle(path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Pickle file not found: {path}")
+    
+    if 'super' not in df.attrs:
+        df.attrs['super'] = {
+            'name': '',
+            'description': '',
+            'column_descriptions': {col: '' for col in df.columns},
+            'column_types': {}
+        }
+        # Initialize column types
+        df.super._infer_column_types()
+    return df
+    
 def read_csv(path: str, include_metadata: bool = True, **kwargs) -> pd.DataFrame:
     """
     Read a CSV file into a DataFrame with super accessor metadata.
@@ -735,13 +758,13 @@ def create_super_dataframe(*args, **kwargs) -> pd.DataFrame:
     """
     name = kwargs.pop('name', '')
     description = kwargs.pop('description', '')
-    column_descriptions = kwargs.pop('column_descriptions', {})
+    column_descriptions = kwargs.pop('column_descriptions', None)
     
     df = pd.DataFrame(*args, **kwargs)
     df.attrs['super'] = {
         'name': name,
         'description': description,
-        'column_descriptions': column_descriptions,
+        'column_descriptions': column_descriptions or {col: '' for col in df.columns},
         'column_types': {}
     }
     df.super._infer_column_types()

@@ -27,7 +27,7 @@ class TestLLMIntegration:
         
         assert df.super.name != ''
         assert df.super.description != ''
-        assert len(df.super.get_column_descriptions()) > 0
+        assert len(df.super.column_descriptions) > 0
         
         # Test with existing metadata
         df2 = create_super_dataframe(
@@ -47,7 +47,7 @@ class TestLLMIntegration:
         
         assert result.super.name != ''
         assert result.super.description != ''
-        assert len(result.super.get_column_descriptions()) > 0
+        assert len(result.super.column_descriptions) > 0
     
     def test_llm_client_error_handling(self):
         """Test error handling in LLMClient"""
