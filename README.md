@@ -220,6 +220,9 @@ df = spd.read_pickle("data.pkl")
 The `SuperPandasConfig` class manages global configuration settings:
 
 ```python
+from superpandas import SuperPandasConfig
+
+# Create a new configuration
 config = SuperPandasConfig()
 
 # Available settings
@@ -229,10 +232,21 @@ config.llm_kwargs = {'existing_values': 'warn'}  # Additional LLM arguments
 config.system_template = "..."  # System prompt template
 config.user_template = "..."  # User prompt template
 
+# Set as default configuration for the library
+import superpandas as spd
+spd.set_default_config(config)
+
 # Save/load configuration
 config.save()  # Saves to ~/.cache/superpandas/config.json
 config.load()  # Loads from default path
 ```
+
+The default configuration is automatically loaded when the library is imported. You can:
+1. Create a new configuration and set it as default using `spd.set_default_config()`
+2. Modify the existing default configuration directly
+3. Save and load configurations to/from disk
+
+The default configuration persists across module reloads and is shared across all DataFrames unless explicitly overridden.
 
 ### Error Handling
 

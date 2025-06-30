@@ -8,7 +8,7 @@ This guide provides an overview of how to use SuperPandas, from creating enhance
 Creating SuperDataFrame
 -----------------------
 
-You can create a SuperDataFrame in two main ways:
+You can create a SuperDataFrame in the following two ways (For more information on SuperDataFrames, see :ref:`api`):
 
 **Method 1: Create a SuperDataFrame explicitly with metadata**
 
@@ -38,7 +38,7 @@ You can create a SuperDataFrame in two main ways:
    # Access metadata
    print(sdf.super.name)
    print(sdf.super.description)
-   print(sdf.super.get_column_descriptions())
+   print(sdf.super.column_descriptions)
    print(sdf.super.column_types)
 
 **Method 2: Explicitly add metadata to an existing DataFrame**
@@ -47,9 +47,9 @@ You can create a SuperDataFrame in two main ways:
 
    import pandas as pd
    import numpy as np
-   import superpandas # adds 'super' namespace to pandas
+   import superpandas # adds 'super' namespace to pandas without changing the existing code(see :ref:`api`)
 
-   # Using df from the previous example
+   # Any dataframe from existing code
    df = pd.DataFrame({
        'date': pd.date_range(start='2023-01-01', periods=6, freq='ME'),
        'region': ['North', 'South', 'East', 'West', 'North', 'South'],
@@ -66,7 +66,7 @@ You can create a SuperDataFrame in two main ways:
    })
    print(df.super.name)
    print(df.super.description)
-   print(df.super.get_column_descriptions())
+   print(df.super.column_descriptions)
    print(df.super.column_types)
 
 Core Methods
@@ -104,17 +104,17 @@ Manage and access metadata associated with your DataFrame.
 Schema Generation
 ~~~~~~~~~~~~~~~~~
 
-Generate a schema representation of your DataFrame, useful for LLM context or data documentation.
+Generate a schema representation of your DataFrame to be used as context for LLMs.
 
 .. code-block:: python
 
-   # Assuming df is a SuperDataFrame or a Pandas DataFrame with the .super accessor
+   # Assuming sdf is a SuperDataFrame or a Pandas DataFrame with the .super accessor
 
    # Generate schema in different formats
-   schema_text = df.super.get_schema(
+   schema_text = sdf.super.get_schema(
        template=None,  # Optional custom template
-       format_type='text',  # Options: 'json', 'markdown', 'text', 'yaml'
-       max_rows=5  # Number of sample rows to include
+       format_type='text',  # Options: 'json', 'markdown', 'text', 'yaml' (default: 'text')
+       max_rows=5  # Optional: Number of sample rows to include
    )
    print(schema_text)
 
@@ -128,7 +128,7 @@ Generate a schema representation of your DataFrame, useful for LLM context or da
    Columns:
    {columns}
    """
-   schema_custom = df.super.get_schema(template=custom_template)
+   schema_custom = sdf.super.get_schema(template=custom_template)
    print(schema_custom)
 
 LLM Integration
@@ -153,7 +153,7 @@ Supported providers include:
 
    # List available providers
    providers = LLMClient.available_providers()
-   print(list(providers.keys())) # Modified to print the list of keys
+   print(providers) 
 
    # Initialize LLM config
    config = SuperPandasConfig()
@@ -197,29 +197,25 @@ Supported providers include:
 Serialization
 -------------
 
-Save and load DataFrames with their metadata.
+Save and load SuperDataFrames with their metadata.
 
-CSV with Metadata
-~~~~~~~~~~~~~~~~~
+CSV
+~~~
 
 .. code-block:: python
 
    import superpandas as spd
-   # Assuming df is a SuperDataFrame or a Pandas DataFrame with the .super accessor
+   # Assuming sdf is a SuperDataFrame or a Pandas DataFrame with the .super accessor
 
    # Save with metadata
-   df.super.to_csv("data.csv", include_metadata=True, index=False)
+   sdf.super.to_csv("data.csv", include_metadata=True, index=False)
    # This saves metadata to data_metadata.json alongside data.csv.
 
    # Load with metadata (overloads pandas.read_csv)
-   df_loaded_csv = spd.read_csv("data.csv", include_metadata=True)
-   # print(df_loaded_csv.super.name)
+   sdf_loaded_csv = spd.read_csv("data.csv", include_metadata=True)
 
-   # Load without metadata (initializes empty metadata if not found)
-   # df_loaded_no_meta = spd.read_csv("data.csv", include_metadata=False)
-
-   # Read metadata separately into an existing DataFrame
-   # df.super.read_metadata("data.csv")
+   # Load without metadata (initializes empty metadata)
+   sdf_loaded_no_meta = spd.read_csv("data.csv", include_metadata=False)
 
 Pickle
 ~~~~~~
@@ -227,24 +223,26 @@ Pickle
 .. code-block:: python
 
    import superpandas as spd
-   # Assuming df is a SuperDataFrame or a Pandas DataFrame with the .super accessor
+   # Assuming sdf is a SuperDataFrame or a Pandas DataFrame with the .super accessor
 
    # Save to pickle
-   df.super.to_pickle("data.pkl")
+   sdf.super.to_pickle("data.pkl")
 
    # Read from pickle
-   df_loaded_pkl = spd.read_pickle("data.pkl")
-   # print(df_loaded_pkl.super.name)
+   sdf_loaded_pkl = spd.read_pickle("data.pkl")
+   # print(sdf_loaded_pkl.super.name)
 
 Configuration
 -------------
 
-Manage global configuration settings using `SuperPandasConfig`.
+Manage configuration settings using `SuperPandasConfig`.
 
 .. code-block:: python
 
    from superpandas import SuperPandasConfig
+   import superpandas as spd
 
+   # Create a new configuration
    config = SuperPandasConfig()
 
    # Available settings
@@ -254,10 +252,21 @@ Manage global configuration settings using `SuperPandasConfig`.
    config.system_template = "Your default system prompt template..."
    config.user_template = "Your default user prompt template for {query} on {name}..."
 
+   # Set as default configuration for the library
+   spd.set_default_config(config)
+
    # Save/load configuration
-   # config.save()  # Saves to ~/.cache/superpandas/config.json
-   # config.load()  # Loads from default path
-   # print(f"Loaded provider: {config.provider}")
+   config.save()  # Saves to ~/.cache/superpandas/config.json
+   config.load()  # Loads from default path
+   print(f"Loaded provider: {config.provider}")
+
+The default configuration is automatically loaded when the library is imported. You can:
+
+1. Create a new configuration and set it as default using ``spd.set_default_config()``
+2. Modify the existing default configuration directly
+3. Save and load configurations to/from disk
+
+The default configuration persists across module reloads and is shared across all DataFrames unless explicitly overridden.
 
 Error Handling
 --------------
@@ -265,10 +274,12 @@ Error Handling
 SuperPandas provides options for handling errors in certain operations:
 
 - Column description methods (`set_column_description`, `set_column_descriptions`):
+
   - ``'raise'``: Raise `ValueError` for non-existent columns (default).
   - ``'ignore'``: Silently skip non-existent columns.
   - ``'warn'``: Warn and skip non-existent columns.
 
 - CSV reading with metadata (`read_csv` from `superpandas`):
+
   - `include_metadata=True`: Raises `FileNotFoundError` if the corresponding metadata file (`*_metadata.json`) is not found.
   - `include_metadata=False`: Initializes empty metadata if the metadata file is not found (reads only the CSV).

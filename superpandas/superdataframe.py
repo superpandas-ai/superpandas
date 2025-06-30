@@ -3,20 +3,11 @@ import warnings
 import pandas as pd
 import json
 import yaml
-from typing import Dict, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from .config import SuperPandasConfig
-from .llm_client import LLMClient
-
-DEFAULT_SCHEMA_TEMPLATE = """
-                        DataFrame Name: {name}
-                        DataFrame Description: {description}
-
-                        Shape: {shape}
-
-                        Columns:
-                        {columns}
-                        """
+from .llm_client import LLMClient, LLMResponse, LLMMessage
+from .templates import schema_template
 
 @pd.api.extensions.register_dataframe_accessor("super")
 class SuperDataFrameAccessor:
@@ -26,10 +17,9 @@ class SuperDataFrameAccessor:
     - dataframe description
     - column descriptions
     - column data types (with refined types for object columns)
-    - system and user templates for LLMs
     - query method for LLMs
     - auto_describe method for LLMs
-    - schema serialization for LLMs
+    - schema generation/serialization for LLMs
     """
     
     def __init__(self, pandas_obj):
@@ -37,8 +27,8 @@ class SuperDataFrameAccessor:
         self._obj = pandas_obj
         self._validate(pandas_obj)
         self._initialize_metadata()
-        self._llm_client = None  # Initialize LLM client as None
-        self._config = None  # Initialize config as None
+        self.config = SuperPandasConfig.get_default_config()
+        self.llm_client = LLMClient(config=self.config)
 
     def _validate(self, obj):
         """Validate the pandas object"""
@@ -134,30 +124,7 @@ class SuperDataFrameAccessor:
     @property
     def column_descriptions(self) -> Dict[str, str]:
         """Get all column descriptions as strings"""
-        return {col: desc for col, desc in self._obj.attrs['super']['column_descriptions'].items()}
-    
-    # @column_descriptions.setter
-    # def column_descriptions(self, column_descriptions: Dict[str, str]):
-    #     """Set descriptions for multiple columns at once
-        
-    #     Parameters:
-    #     -----------
-    #     column_descriptions : dict(str, str)
-    #         A dictionary mapping column names to their descriptions
-            
-    #     Raises:
-    #     -------
-    #     ValueError
-    #         If any column does not exist in the dataframe
-    #     """
-    #     # Validate all columns
-    #     invalid_cols = [col for col in column_descriptions.keys() if col not in self._obj.columns]
-    #     if invalid_cols:
-    #         raise ValueError(f"Columns {invalid_cols} do not exist in the dataframe")
-        
-    #     # Update descriptions
-    #     for column, col_desc in column_descriptions.items():
-    #         self._obj.attrs['super']['column_descriptions'][column] = col_desc
+        return self._obj.attrs['super']['column_descriptions']
 
     def get_column_description(self, column: str) -> str:
         """Get description for a specific column as a string
@@ -208,35 +175,20 @@ class SuperDataFrameAccessor:
         for column, description in column_descriptions.items():
             self.set_column_description(column, description, errors)
 
-    @property
-    def system_template(self) -> str:
-        """Get the system template"""
-        return self._obj.attrs['super'].get('system_template', '')
-    
-    @system_template.setter
-    def system_template(self, value: str):
-        """Set the system template"""
-        self._obj.attrs['super']['system_template'] = value
-
     def refresh_column_types(self):
         """Refresh the inferred column types"""
         self._infer_column_types()
         return self._obj.attrs['super']['column_types']
 
-    def get_schema(self, template: Optional[str] = None, format_type: Literal['json', 'markdown', 'text', 'yaml'] = 'text', max_rows: int = 5) -> str:
+    def get_schema(self, 
+                   format_type: Literal['json', 'markdown', 'text', 'yaml'] = 'text', 
+                   max_rows: int = 5,
+                   ) -> str:
         """
-        Generate a schema representation of the dataframe for use with LLMs.
+        Generate a schema representation of the dataframe for use with LLMs. The template is defined in the config.
         
         Parameters:
         -----------
-        template : str, optional
-            A template string with placeholders for formatting the schema.
-            Available placeholders:
-            - {name}: The dataframe name
-            - {description}: The dataframe description
-            - {columns}: The formatted column information, including refined type and description
-            - {dtypes}: The dataframe dtypes
-            - {shape}: The dataframe shape
         format_type : Literal['json', 'markdown', 'text', 'yaml'], default 'text'
             The format to convert to ('json', 'markdown', 'text', 'yaml')
         max_rows : int, default 5
@@ -247,10 +199,8 @@ class SuperDataFrameAccessor:
         str
             A formatted schema representation
         """
-        if template is None:
-            template = dedent(DEFAULT_SCHEMA_TEMPLATE)
-        else:
-            template = dedent(template)
+
+        template = dedent(self.config.schema_template)
         
         # Format column information
         columns_info = []
@@ -271,9 +221,8 @@ class SuperDataFrameAccessor:
                     "name": self.name,
                     "description": self.description,
                     "shape": self._obj.shape,
-                    "columns": {
+                    "column_info": {
                         col: {
-                            "pandas_dtype": str(self._obj.dtypes[col]),
                             "refined_type": self.column_types.get(col, str(self._obj.dtypes[col])),
                             "description": self.get_column_description(col)
                         } for col in self._obj.columns
@@ -308,8 +257,7 @@ class SuperDataFrameAccessor:
             schema_str = template.format(
                 name=self.name,
                 description=self.description,
-                columns=columns_str,
-                dtypes=str(self._obj.dtypes),
+                column_info=columns_str,
                 shape=str(self._obj.shape)
             )
             
@@ -327,9 +275,8 @@ class SuperDataFrameAccessor:
                     "name": self.name,
                     "description": self.description,
                     "shape": self._obj.shape,
-                    "columns": {
+                    "column_info": {
                         col: {
-                            "pandas_dtype": str(self._obj.dtypes[col]),
                             "refined_type": self.column_types.get(col, str(self._obj.dtypes[col])),
                             "description": self.get_column_description(col)
                         } for col in self._obj.columns
@@ -394,9 +341,17 @@ class SuperDataFrameAccessor:
             data.attrs['super']['column_descriptions'] = self._obj.attrs['super']['column_descriptions'].copy()
             data.attrs['super']['column_types'] = self._obj.attrs['super']['column_types'].copy()
         return data
+    
+    def __eq__(self, other):
+        """
+        Check if two SuperDataFrames are equal. # TODO: only works with df.super==df1.super
+        """
+        is_df_equal = self._obj.equals(other._obj)
+        is_metadata_equal = self._obj.attrs['super'] == other._obj.attrs['super']
+        return is_df_equal and is_metadata_equal
 
     @classmethod
-    def _concat(cls, objs, **kwargs):
+    def _concat(cls, objs, **kwargs): # TODO: check if this is correct  .
         """
         Concatenate SuperDataFrames preserving metadata from the first object
         """
@@ -453,12 +408,11 @@ class SuperDataFrameAccessor:
                 'description': self._obj.attrs['super']['description'],
                 'column_descriptions': self.column_descriptions,
                 'column_types': self.column_types,
-                'dtypes': {col: str(dtype) for col, dtype in self._obj.dtypes.items()}
             }
             with open(metadata_path, 'w', encoding='utf-8') as f:
                 json.dump(metadata, f, indent=2)
 
-    def read_metadata(self, csv_path: str):
+    def read_metadata(self, csv_path: str, raise_error: bool = False):
         """
         Read metadata from a companion JSON file for a CSV file.
         
@@ -466,6 +420,9 @@ class SuperDataFrameAccessor:
         -----------
         csv_path : str
             Path to the CSV file (metadata file path will be derived from this)
+        raise_error : bool, default False
+            If True, raises FileNotFoundError when metadata file is not found
+            If False, initializes empty metadata when metadata file is not found
         """
         path_str = str(csv_path)
         metadata_path = path_str.rsplit('.', 1)[0] + '_metadata.json'
@@ -476,30 +433,32 @@ class SuperDataFrameAccessor:
                     'name': metadata.get('name', ''),
                     'description': metadata.get('description', ''),
                     'column_descriptions': metadata.get('column_descriptions', {}),
-                    'column_types': metadata.get('column_types', {})
+                    'column_types': metadata.get('column_types', {}),
+                    'config': metadata.get('config', {})
                 }
         except FileNotFoundError:
+            if raise_error:
+                raise FileNotFoundError(f"Metadata file not found: {metadata_path}")
             # Initialize empty metadata if no metadata file exists
             self._obj.attrs['super'] = {
                 'name': '',
                 'description': '',
                 'column_descriptions': {},
-                'column_types': {}
+                'column_types': {},
             }
+            self.config = SuperPandasConfig.get_default_config()
             self._infer_column_types()
 
     def auto_describe(self,
-                     config: Optional[SuperPandasConfig] = None,
                      generate_name: bool = False,
                      generate_description: bool = False,
                      generate_column_descriptions: bool = False,
                      existing_values: Optional[Literal['warn', 'skip', 'overwrite']] = None,
-                     **model_kwargs) -> pd.DataFrame:
+                     ) -> pd.DataFrame:
         """
         Automatically generate descriptions for this DataFrame using LLMs.
         
         Args:
-            config: SuperPandasConfig instance. If None, uses the instance's config
             generate_name: Whether to generate DataFrame name
             generate_description: Whether to generate overall DataFrame description
             generate_column_descriptions: Whether to generate column descriptions
@@ -507,24 +466,14 @@ class SuperDataFrameAccessor:
                 - 'warn': Warn and skip if value exists
                 - 'skip': Silently skip if value exists
                 - 'overwrite': Replace existing values
-            **model_kwargs: Additional arguments to pass to the model provider
         
         Returns:
             self._obj: The DataFrame with updated descriptions
         """
         
-        # Use instance config if no explicit config provided
-        if config is not None:
-            self.config = config
-        
-        # Merge config kwargs with provided kwargs, handling existing_values specially
-        merged_kwargs = {**self.config.llm_kwargs, **model_kwargs}
-        if existing_values is not None:
-            merged_kwargs['existing_values'] = existing_values
-        existing_values = merged_kwargs.pop('existing_values', 'warn')
-        
-        # Update the LLM client with new config and kwargs
-        self.llm_client = LLMClient(config=self.config, **merged_kwargs)
+        # Use provided existing_values or fall back to config value
+        if existing_values is None:
+            existing_values = self.config.existing_values
         
         if generate_name and (not self.name or existing_values == 'overwrite'):
             self.name = self.llm_client.generate_df_name(self._obj)
@@ -568,70 +517,39 @@ class SuperDataFrameAccessor:
     def __repr__(self):
         return self.__str__()
 
-    def query(self, question: str, 
-              system_template: Optional[str] = None, 
-              user_template: Optional[str] = None) -> str:
+    def query(self, prompt: str) -> LLMResponse:
         """
         Query the DataFrame using an LLM with a given question and optional templates.
         
         Parameters:
         -----------
-        question : str
+        user_message : str
             The question to ask about the DataFrame.
-        system_template : str, optional
-            A system template string for formatting the query message.
-            If not provided, uses the instance system template if set,
-            otherwise falls back to config system template.
-        user_template : str, optional
-            A user template string for formatting the query message. 
-            If not provided, uses the default user template.
+
         Returns:
         --------
-        str
+        LLMResponse
             The response from the LLM.
         """
-        # Use the instance system template if set, otherwise use config
-        if system_template is None:
-            system_template = self.system_template or self.config.system_template
 
-        # Use the user template from config if no user template is provided
-        user_template = self.config.user_template if user_template is None else user_template
+        system_message = self.config.system_template
+        user_message = self.config.user_template.format(schema=self.get_schema(format_type='text'),
+                                                        question=prompt)
 
-        # Format the message using the provided templates
-        system_message = system_template.format(schema=self.get_schema())
-        user_message = user_template.format(schema=self.get_schema(), question=question)
+        messages = [LLMMessage(role='system', content=system_message),
+                    LLMMessage(role='user', content=user_message)] # TODO: add a chat history.
 
         # Query the LLM client
-        response = self.llm_client.query(system_message=system_message, user_message=user_message)
+        response = self.llm_client.query(messages=messages)
 
         return response
-
-    @property
-    def config(self) -> SuperPandasConfig:
-        """Get the SuperPandasConfig instance. Creates one if it doesn't exist."""
-        if self._config is None:
-            self._config = SuperPandasConfig()
-        return self._config
-
-    @config.setter
-    def config(self, config: SuperPandasConfig):
-        """Set the SuperPandasConfig instance."""
-        self._config = config
-        # Update LLM client with new config if it exists
-        if self._llm_client is not None:
-            self._llm_client = LLMClient(config=config)
-
-    @property
-    def llm_client(self) -> LLMClient:
-        """Get the LLM client instance. Creates one if it doesn't exist."""
-        if self._llm_client is None:
-            self._llm_client = LLMClient(config=self.config)
-        return self._llm_client
-
-    @llm_client.setter
-    def llm_client(self, client: LLMClient):
-        """Set the LLM client instance."""
-        self._llm_client = client
+    
+    def chat(self, messages: List[LLMMessage]) -> LLMResponse:
+        """
+        Chat with the DataFrame using an LLM with a given messages. 
+        # TODO: add a chat history.
+        """
+        return self.llm_client.query(messages=messages)
 
 def read_pickle(path: str) -> pd.DataFrame:
     """
@@ -648,7 +566,7 @@ def read_pickle(path: str) -> pd.DataFrame:
         DataFrame with initialized super accessor metadata
         
     Examples:
-    --------
+    ---------
     >>> import superpandas as spd
     >>> # Read pickle with metadata
     >>> df = spd.read_pickle('data.pkl')
@@ -693,7 +611,7 @@ def read_csv(path: str, include_metadata: bool = True, **kwargs) -> pd.DataFrame
         If the CSV file is not found, or if include_metadata=True and metadata file is not found
         
     Examples:
-    --------
+    ---------
     >>> import superpandas as spd
     >>> # Read CSV with metadata (will raise error if metadata file not found)
     >>> df = spd.read_csv('data.csv')
@@ -704,46 +622,25 @@ def read_csv(path: str, include_metadata: bool = True, **kwargs) -> pd.DataFrame
     >>> # Pass pandas read_csv arguments
     >>> df = spd.read_csv('data.csv', index_col=0, parse_dates=['date_column'])
     """
-    # Try to read metadata
-    path_str = str(path)
-    metadata_path = path_str.rsplit('.', 1)[0] + '_metadata.json'
-
-    try:
-        with open(metadata_path, 'r', encoding='utf-8') as f:
-            metadata = json.load(f)
-            # Add parse_dates for datetime columns based on metadata
-            if 'dtypes' in metadata:
-                date_columns = [col for col, dtype in metadata['dtypes'].items() 
-                              if 'datetime' in dtype.lower()]
-                if date_columns:
-                    kwargs.setdefault('parse_dates', date_columns)
-    except FileNotFoundError:
-        if include_metadata:
-            raise FileNotFoundError(f"Metadata file not found: {metadata_path}")
-    
     # Read the CSV data
     df = pd.read_csv(path, **kwargs)
     
+    # Initialize the super accessor
+    df.attrs['super'] = {
+        'name': '',
+        'description': '',
+        'column_descriptions': {},
+        'column_types': {}
+    }
+    
+    # Try to read metadata
     try:
-        with open(metadata_path, 'r', encoding='utf-8') as f:
-            metadata = json.load(f)
-            df.attrs['super'] = {
-                'name': metadata.get('name', ''),
-                'description': metadata.get('description', ''),
-                'column_descriptions': metadata.get('column_descriptions', {}),
-                'column_types': metadata.get('column_types', {})
-            }
+        df.super.read_metadata(path, raise_error=include_metadata)
     except FileNotFoundError:
         if include_metadata:
-            raise FileNotFoundError(f"Metadata file not found: {metadata_path}")
+            raise FileNotFoundError(f"Metadata file not found: {path.rsplit('.', 1)[0] + '_metadata.json'}")
         else:
-            # Initialize empty metadata if metadata file doesn't exist
-            df.attrs['super'] = {
-                'name': '',
-                'description': '',
-                'column_descriptions': {},
-                'column_types': {}
-            }
+            # Initialize column types if no metadata file
             df.super._infer_column_types()
             
     return df
@@ -768,4 +665,5 @@ def create_super_dataframe(*args, **kwargs) -> pd.DataFrame:
         'column_types': {}
     }
     df.super._infer_column_types()
+    df.super.config = SuperPandasConfig.get_default_config()
     return df 

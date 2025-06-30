@@ -1,12 +1,62 @@
 """
 Configuration settings for SuperPandas
 """
-from typing import Literal, Optional, Type, Union, Dict, Any
+from typing import Literal, Optional, Dict, Any
 import json
 import os
-from smolagents import Model
-from .templates import system_template, user_template  # Import the system_template
 
+from .templates import system_template, user_template, schema_template
+
+# Import individual providers
+available_providers = {}
+
+try:
+    from smolagents import LiteLLMModel
+    available_providers['lite'] = LiteLLMModel
+except ImportError:
+    pass
+
+try:
+    from smolagents import OpenAIServerModel
+    available_providers['openai'] = OpenAIServerModel
+except ImportError:
+    pass
+
+try:
+    from smolagents import InferenceClientModel
+    available_providers['hf'] = InferenceClientModel
+except ImportError:
+    pass
+
+try:
+    from smolagents import TransformersModel
+    available_providers['tf'] = TransformersModel
+except ImportError:
+    pass
+
+try:
+    from smolagents import VLLMModel
+    available_providers['vllm'] = VLLMModel
+except ImportError:
+    pass
+
+try:
+    from smolagents import MLXModel
+    available_providers['mlx'] = MLXModel
+except ImportError:
+    pass
+
+try:
+    from smolagents import AzureOpenAIServerModel
+    available_providers['openai_az'] = AzureOpenAIServerModel
+except ImportError:
+    pass
+
+try:
+    from smolagents import AmazonBedrockServerModel
+    available_providers['bedrock'] = AmazonBedrockServerModel
+except ImportError:
+    pass
 
 class SuperPandasConfig:
     """
@@ -18,87 +68,201 @@ class SuperPandasConfig:
 
     :cvar DEFAULT_CONFIG_PATH: The default path for storing the configuration file
                                (`~/.cache/superpandas/config.json`).
+    :cvar default_config: Class-level default configuration instance that can be modified by users.
     :ivar _provider: Name of the default LLM provider.
     :ivar _model: Name or identifier of the default LLM model.
-    :ivar _llm_kwargs: Dictionary of keyword arguments for LLM initialization.
-                       Includes `existing_values` strategy ('warn', 'skip', 'overwrite').
-    :ivar _system_template: Default system prompt template.
+    :ivar llm_kwargs: Dictionary of keyword arguments for LLM invocation.
+    :ivar _existing_values: Strategy for handling existing metadata values ('warn', 'skip', 'overwrite').
+    :ivar system_template: Default system prompt template.
     :ivar _user_template: Default user prompt template.
+    :ivar _schema_template: Default schema prompt template.
     """
 
     DEFAULT_CONFIG_PATH = os.path.expanduser(
         "~/.cache/superpandas/config.json")
+    
+    # Class-level default config that can be modified by users
+    default_config = None
 
-    def __init__(self):
-        """Initializes SuperPandasConfig with default values and attempts to load from file."""
-        self._provider: str = "HfApiModel"
-        self._model: str = "meta-llama/Llama-3.2-3B-Instruct"
-        self._llm_kwargs: Dict[str, Any] = {'existing_values': 'warn'}
-        self._system_template: str = system_template  # Default from templates.py
-        self._user_template: str = user_template    # Default from templates.py
-        self.load()  # Attempt to load saved configuration
+    def __init__(self, load_saved: bool = False):
+        """Initializes SuperPandasConfig with default values.
+        
+        Parameters:
+        -----------
+        load_saved : bool, default False
+            Whether to load saved configuration from file
+        """
+        self._provider: str = "hf"
+        self.model: str = "meta-llama/Llama-3.2-3B-Instruct"
+        self.llm_kwargs: Dict[str, Any] = {}
+        self._existing_values: Literal['warn', 'skip', 'overwrite'] = 'warn'
+        self.system_template: str = system_template  # Default from templates.py
+        self._user_template: str = user_template  # Default from templates.py
+        self._schema_template: str = schema_template  # Default from templates.py
+        if load_saved:
+            self.load()  # Only load saved configuration if requested
+
+    @classmethod
+    def set_default_config(cls, config: 'SuperPandasConfig'):
+        """
+        Set the default configuration instance for the library.
+        
+        Parameters:
+        -----------
+        config : SuperPandasConfig
+            The configuration instance to use as default
+        """
+        cls.default_config = config
+        # Save the config to the default path
+        config.save()
+
+    @classmethod
+    def get_default_config(cls) -> 'SuperPandasConfig':
+        """
+        Get the default configuration instance, creating one if it doesn't exist.
+        
+        Returns:
+        --------
+        SuperPandasConfig
+            The default configuration instance
+        """
+        if cls.default_config is None:
+            # Try to load from the config file
+            if os.path.exists(cls.DEFAULT_CONFIG_PATH):
+                config = cls()
+                config.load()
+                cls.default_config = config
+            else:
+                # If no config file exists, create one with package defaults
+                config = cls()
+                config.save()  # Save the default config
+                cls.default_config = config
+        return cls.default_config
 
     @property
-    def provider(self) -> Literal['LiteLLMModel', 'OpenAIServerModel', 'HfApiModel', 'TransformersModel', 'VLLMModel', 'MLXModel', 'AzureOpenAIServerModel']:
-        """The default LLM provider name (e.g., 'OpenAIServerModel', 'HfApiModel')."""
+    def provider(self) -> Literal['lite', 
+                                  'openai', 
+                                  'hf', 
+                                  'tf', 
+                                  'vllm', 
+                                  'mlx', 
+                                  'openai_az',
+                                  'bedrock',
+                                  ]:
+        """The default LLM provider name (e.g., 'openai', 'hf', 'vllm', 'mlx', 'bedrock' etc)."""
+
         return self._provider
 
     @provider.setter
-    def provider(self, value: Literal['LiteLLMModel', 'OpenAIServerModel', 'HfApiModel', 'TransformersModel', 'VLLMModel', 'MLXModel', 'AzureOpenAIServerModel']):
+    def provider(self, value: Literal['lite', 
+                                      'openai', 
+                                      'hf', 
+                                      'tf', 
+                                      'vllm', 
+                                      'mlx', 
+                                      'openai_az',
+                                      'bedrock',
+                                      ]):
         """Sets the default LLM provider name."""
+        if value not in available_providers:
+            raise ValueError(f"Provider {value} is not available. Please install smolagents with the provider.")
         self._provider = value
 
     @property
-    def model(self) -> str:
-        """The default LLM model name or identifier (e.g., 'gpt-3.5-turbo')."""
-        return self._model
+    def existing_values(self) -> Literal['warn', 'skip', 'overwrite']:
+        """
+        Strategy for handling existing metadata values.
+        
+        Returns:
+        --------
+        Literal['warn', 'skip', 'overwrite']
+            The strategy to use when handling existing metadata values
+        """
+        return self._existing_values
 
-    @model.setter
-    def model(self, value: str):
-        """Sets the default LLM model name."""
-        self._model = value
+    @existing_values.setter
+    def existing_values(self, value: Literal['warn', 'skip', 'overwrite']):
+        """
+        Sets the strategy for handling existing metadata values.
+        
+        Parameters:
+        -----------
+        value : Literal['warn', 'skip', 'overwrite']
+            The strategy to use when handling existing metadata values
+            
+        Raises:
+        -------
+        ValueError
+            If value is not one of 'warn', 'skip', or 'overwrite'
+        """
+        if value not in ('warn', 'skip', 'overwrite'):
+            raise ValueError("existing_values must be one of: 'warn', 'skip', 'overwrite'")
+        self._existing_values = value
 
     @property
-    def llm_kwargs(self) -> Dict[str, Any]:
+    def schema_template(self) -> str:
+        """Get the system template"""
+        return self._schema_template
+    
+    @schema_template.setter
+    def schema_template(self, value: str):
+        """Set the system template
+        
+        Parameters:
+        -----------
+        value : str
+            The system template string. Must contain the following placeholders:
+            - {name}: The dataframe name
+            - {description}: The dataframe description
+            - {column_info}: The formatted column information
+            - {shape}: The dataframe shape
+            
+        Raises:
+        -------
+        ValueError
+            If the template is missing any required placeholders
         """
-        Additional keyword arguments for LLM initialization.
-
-        This can include provider-specific parameters or the `existing_values`
-        strategy ('warn', 'skip', 'overwrite') for metadata generation.
-        """
-        return self._llm_kwargs
-
-    @llm_kwargs.setter
-    def llm_kwargs(self, kwargs: Dict[str, Any]):
-        """
-        Sets additional LLM initialization keyword arguments.
-
-        :raises ValueError: If `existing_values` is provided and not one of
-                            'warn', 'skip', or 'overwrite'.
-        """
-        if 'existing_values' in kwargs and kwargs['existing_values'] not in ('warn', 'skip', 'overwrite'):
+        required_placeholders = ['{name}', '{description}', '{column_info}', '{shape}'] # TODO: check if we can make any optional.
+        missing_placeholders = [p for p in required_placeholders if p not in value]
+        
+        if missing_placeholders:
             raise ValueError(
-                "existing_values must be one of: 'warn', 'skip', 'overwrite'")
-        self._llm_kwargs = kwargs
-
-    @property
-    def system_template(self) -> str:
-        """The default system prompt template for LLM queries."""
-        return self._system_template
-
-    @system_template.setter
-    def system_template(self, value: str):
-        """Sets the default system prompt template."""
-        self._system_template = value
+                f"System template is missing required placeholders: {', '.join(missing_placeholders)}. "
+                "All templates must include: {name}, {description}, {column_info}, and {shape}"
+            )
+            
+        self._schema_template = value
 
     @property
     def user_template(self) -> str:
-        """The default user prompt template for LLM queries."""
+        """Get the user template"""
         return self._user_template
-
+    
     @user_template.setter
     def user_template(self, value: str):
-        """Sets the default user prompt template."""
+        """Set the user template
+        
+        Parameters:
+        -----------
+        value : str
+            The user template string. Must contain the following placeholders:
+            - {question}: The user's question
+            - {schema}: The dataframe schema information
+            
+        Raises:
+        -------
+        ValueError
+            If the template is missing any required placeholders
+        """
+        required_placeholders = ['{question}', '{schema}']
+        missing_placeholders = [p for p in required_placeholders if p not in value]
+        
+        if missing_placeholders:
+            raise ValueError(
+                f"User template is missing required placeholders: {', '.join(missing_placeholders)}. "
+                "All templates must include: {question} and {schema}"
+            )
+            
         self._user_template = value
 
     def __str__(self) -> str:
@@ -106,7 +270,10 @@ class SuperPandasConfig:
                 f"provider={self.provider}, "
                 f"model={self.model}, "
                 f"llm_kwargs={self.llm_kwargs}, "
-                f"system_template={self.system_template})")
+                f"existing_values={self.existing_values}, "
+                f"system_template={self.system_template}, "
+                f"schema_template={self.schema_template}, "
+                f"user_template={self.user_template})")
 
     def __repr__(self):
         return self.__str__()
@@ -122,7 +289,9 @@ class SuperPandasConfig:
             'provider': self.provider,
             'model': self.model,
             'llm_kwargs': self.llm_kwargs,
+            'existing_values': self.existing_values,
             'system_template': self.system_template,
+            'schema_template': self.schema_template,
             'user_template': self.user_template
         }
 
@@ -139,9 +308,12 @@ class SuperPandasConfig:
         self.provider = config_dict.get('provider', self.provider)
         self.model = config_dict.get('model', self.model)
         self.llm_kwargs = config_dict.get('llm_kwargs', self.llm_kwargs)
-        self.system_template = config_dict.get(
+        self.existing_values = config_dict.get('existing_values', self.existing_values)
+        self.system_template = config_dict.get( # TODO: Should we default to system_template?
             'system_template', self.system_template)
-        self.user_template = config_dict.get(
+        self.schema_template = config_dict.get( # TODO: Should we default to schema_template?
+            'schema_template', self.schema_template)
+        self.user_template = config_dict.get( # TODO: Should we default to user_template?
             'user_template', self.user_template)
 
     def save(self, filepath: Optional[str] = None):
@@ -189,6 +361,8 @@ class SuperPandasConfig:
             # Re-initialize defaults if loading fails badly
             self._provider = "HfApiModel"
             self._model = "meta-llama/Llama-3.2-3B-Instruct"
-            self._llm_kwargs = {'existing_values': 'warn'}
-            self._system_template = system_template
+            self.llm_kwargs = {}
+            self._existing_values = 'warn'
+            self.system_template = system_template
+            self._schema_template = schema_template
             self._user_template = user_template

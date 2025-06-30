@@ -1,9 +1,29 @@
 import pytest
 from superpandas import LLMClient, SuperPandasConfig, create_super_dataframe
-from superpandas.llm_client import LLMMessage, LLMResponse, DummyLLMClient
+from superpandas.llm_client import LLMMessage, LLMResponse
 import pandas as pd
 from unittest.mock import Mock, patch
 from pydantic import ValidationError
+from smolagents import Model
+
+class MockModel(Model):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.return_value = LLMResponse(content="test response")
+
+    def __call__(self, *args, **kwargs):
+        # Check if this is a column description request by looking at the prompt
+        if args and isinstance(args[0], list) and len(args[0]) > 0:
+            messages = args[0]
+            if isinstance(messages, list) and len(messages) > 0:
+                message_content = messages[0].get('content', '')
+                if isinstance(message_content, list) and len(message_content) > 0:
+                    text = message_content[0].get('text', '')
+                    # Only return dictionary for column description requests
+                    if 'column' in text.lower() and 'description' in text.lower() and 'format your response as a python dictionary' in text.lower():
+                        return LLMResponse(content='{"A": "desc1", "B": "desc2", "C": "desc3"}')
+        # Return the default response for other operations (name, description)
+        return self.return_value
 
 class TestLLMClient:
     """Test LLM client functionality"""
@@ -43,25 +63,6 @@ class TestLLMClient:
         with pytest.raises(ValidationError):
             LLMResponse(content=123)  # Invalid content type
 
-    def test_dummy_llm_client(self):
-        """Test the DummyLLMClient"""
-        client = DummyLLMClient()
-        
-        # Test query with string
-        response = client.query("test message")
-        assert isinstance(response, LLMResponse)
-        assert "This is a dummy response" in response.content
-        
-        # Test query with LLMMessage
-        message = LLMMessage(role='user', content="test message")
-        response = client.query(message)
-        assert isinstance(response, LLMResponse)
-        
-        # Test query with list of messages
-        messages = [LLMMessage(role='user', content="test message")]
-        response = client.query(messages)
-        assert isinstance(response, LLMResponse)
-
     def test_llm_client_initialization(self):
         """Test LLMClient initialization"""
         # Test with default values
@@ -74,22 +75,24 @@ class TestLLMClient:
         assert client.model is not None
         
         # Test with model string and provider
-        client = LLMClient(model="test-model", provider="HfApiModel")
+        client = LLMClient(model="test-model", provider="lite")
         assert client.model is not None
         
         # Test with existing model instance
-        dummy_model = DummyLLMClient()
-        client = LLMClient(model=dummy_model)
-        assert client.model == dummy_model
+        mock_model = MockModel()
+        client = LLMClient(model=mock_model)
+        assert client.model == mock_model
 
     def test_llm_client_query(self):
         """Test LLMClient query method"""
-        client = DummyLLMClient()
+        # Create a mock model that returns a predictable response
+        mock_model = MockModel()
+        client = LLMClient(model=mock_model)
         
         # Test with string
         response = client.query("test message")
         assert isinstance(response, LLMResponse)
-        assert response.content == "This is a dummy response for prompt: test message"
+        assert response.content == "test response"
         
         # Test with LLMMessage
         message = LLMMessage(role='user', content="test message")
@@ -101,21 +104,24 @@ class TestLLMClient:
         response = client.query(messages)
         assert isinstance(response, LLMResponse)
         
-        # TODO: Test error handling
-        # client.model = None
-        # with pytest.raises(RuntimeError, match="No LLM provider available"):
-        #     client.query("test message")
+        # Test error handling
+        client.model = None
+        with pytest.raises(RuntimeError, match="No LLM provider available"):
+            client.query("test message")
 
     def test_llm_client_description_methods(self, sample_df):
         """Test LLMClient description generation methods"""
-        client = DummyLLMClient()
+        # Create a mock model that returns predictable responses
+        mock_model = MockModel()
+        client = LLMClient(model=mock_model)
         
         # Test generate_df_description
         description = client.generate_df_description(sample_df)
         assert isinstance(description, str)
-        assert "This is a dummy response" in description
+        assert description == "test response"
         
         # Test generate_column_descriptions
+        mock_model.return_value = LLMResponse(content='{"A": "desc1", "B": "desc2", "C": "desc3"}')
         col_descriptions = client.generate_column_descriptions(sample_df)
         assert isinstance(col_descriptions, dict)
         assert all(col in col_descriptions for col in sample_df.columns)
@@ -128,15 +134,16 @@ class TestLLMClient:
         assert df.super.column_descriptions is not col_descriptions  # Should be a copy
         
         # Test generate_df_name
+        mock_model.return_value = LLMResponse(content="test_name")
         name = client.generate_df_name(sample_df)
         assert isinstance(name, str)
-        assert name == "dummy_dataframe_name"
+        assert name == "test_name"
 
     def test_available_providers(self):
         """Test getting available LLM providers"""
         providers = LLMClient.available_providers()
-        assert isinstance(providers, dict)
-        # Check that providers dictionary is not empty
+        assert isinstance(providers, list)
+        # Check that providers list is not empty
         assert len(providers) > 0
 
     @pytest.fixture

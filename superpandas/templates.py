@@ -16,3 +16,13 @@ user_template = """Here are the columns of the dataset with their dtype and some
 Given above data schema, generate python code using pandas library to answer the following question:
 question : {question}
 """
+
+schema_template = """
+DataFrame Name: {name}
+DataFrame Description: {description}
+
+Shape: {shape}
+
+Columns:
+{column_info}
+"""

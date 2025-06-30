@@ -93,8 +93,8 @@ class TestSerialization:
         metadata_path = temp_dir / 'test_no_metadata_metadata.json'
         assert not metadata_path.exists()
         
-        # Test that reading with require_metadata=True raises error
-        with pytest.raises(FileNotFoundError):
+        # Test that reading with include_metadata=True raises error
+        with pytest.raises(FileNotFoundError, match="Metadata file not found"):
             spd.read_csv(str(csv_path), include_metadata=True)
         
         # Test reading without requiring metadata
