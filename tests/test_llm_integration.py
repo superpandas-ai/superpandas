@@ -4,7 +4,7 @@ from superpandas.llm_client import LLMResponse, LLMMessage
 from unittest.mock import Mock, patch
 from smolagents import Model
 import pandas as pd
-from tests.test_llm_client import MockModel
+from test_llm_client import MockModel
 
 
 class TestLLMIntegration:

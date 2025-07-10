@@ -16,7 +16,7 @@ class MockModel(Model):
         if args and isinstance(args[0], list) and len(args[0]) > 0:
             messages = args[0]
             if isinstance(messages, list) and len(messages) > 0:
-                message_content = messages[0].get('content', '')
+                message_content = messages[0].content
                 if isinstance(message_content, list) and len(message_content) > 0:
                     text = message_content[0].get('text', '')
                     # Only return dictionary for column description requests
@@ -74,14 +74,15 @@ class TestLLMClient:
         client = LLMClient(config=config)
         assert client.model is not None
         
-        # Test with model string and provider
-        client = LLMClient(model="test-model", provider="lite")
-        assert client.model is not None
-        
         # Test with existing model instance
         mock_model = MockModel()
         client = LLMClient(model=mock_model)
         assert client.model == mock_model
+        
+        # Test with model string and provider - use mock to avoid dependency issues
+        with patch('superpandas.llm_client.available_providers', {'test_provider': MockModel}):
+            client = LLMClient(model="test-model", provider="test_provider")
+            assert client.model is not None
 
     def test_llm_client_query(self):
         """Test LLMClient query method"""

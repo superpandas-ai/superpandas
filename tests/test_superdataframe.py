@@ -21,7 +21,7 @@ class MockModel(Model):
         if args and isinstance(args[0], list) and len(args[0]) > 0:
             messages = args[0]
             if isinstance(messages, list) and len(messages) > 0:
-                message_content = messages[0].get('content', '')
+                message_content = messages[0].content
                 if isinstance(message_content, list) and len(message_content) > 0:
                     text = message_content[0].get('text', '')
                     if 'column' in text.lower() and 'description' in text.lower() and 'format your response as a python dictionary' in text.lower():

@@ -7,7 +7,6 @@ from typing import Dict, List, Literal, Optional
 
 from .config import SuperPandasConfig
 from .llm_client import LLMClient, LLMResponse, LLMMessage
-from .templates import schema_template
 
 @pd.api.extensions.register_dataframe_accessor("super")
 class SuperDataFrameAccessor:
@@ -17,9 +16,9 @@ class SuperDataFrameAccessor:
     - dataframe description
     - column descriptions
     - column data types (with refined types for object columns)
-    - query method for LLMs
-    - auto_describe method for LLMs
-    - schema generation/serialization for LLMs
+    - query method 
+    - auto_describe method 
+    - schema generation/serialization 
     """
     
     def __init__(self, pandas_obj):
@@ -450,9 +449,9 @@ class SuperDataFrameAccessor:
             self._infer_column_types()
 
     def auto_describe(self,
-                     generate_name: bool = False,
-                     generate_description: bool = False,
-                     generate_column_descriptions: bool = False,
+                     generate_name: bool = True,
+                     generate_description: bool = True,
+                     generate_column_descriptions: bool = True,
                      existing_values: Optional[Literal['warn', 'skip', 'overwrite']] = None,
                      ) -> pd.DataFrame:
         """

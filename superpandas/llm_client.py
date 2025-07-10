@@ -1,9 +1,10 @@
 from textwrap import dedent
-from typing import Dict, Literal, Optional, Union, List, Type, TYPE_CHECKING
+from typing import Dict, Literal, Optional, Union, List
 import pandas as pd
 from smolagents import Model
 from pydantic import BaseModel
-from .config import SuperPandasConfig, available_providers
+from .config import SuperPandasConfig
+from .providers import available_providers
 
 
 class LLMMessage(BaseModel):
@@ -135,9 +136,9 @@ class LLMClient:
         else:
             raise ValueError(f"Invalid messages type: {type(messages)}. Messages must be a string, LLMMessage, or list of LLMMessage objects.")
 
-        payload = [message.model_dump() for message in messages]
+        # payload = [message.model_dump() for message in messages]
 
-        response = self.model(payload, **kwargs)
+        response = self.model(messages, **kwargs)
         return LLMResponse(content=response.content)
 
     def generate_df_description(self, df: pd.DataFrame) -> str:
