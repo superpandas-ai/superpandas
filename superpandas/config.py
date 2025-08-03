@@ -310,7 +310,7 @@ class SuperPandasConfig:
             print(
                 f"Warning: Could not load configuration from {filepath}: {e}. Using defaults.")
             # Re-initialize defaults if loading fails badly
-            self._provider = "HfApiModel"
+            self._provider = "hf"
             self._model = "meta-llama/Llama-3.2-3B-Instruct"
             self.llm_kwargs = {}
             self._existing_values = 'warn'

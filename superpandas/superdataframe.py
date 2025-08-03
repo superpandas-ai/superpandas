@@ -96,6 +96,13 @@ class SuperDataFrameAccessor:
         return f"mixed({', '.join(sorted(types))})"
 
     @property
+    def metadata(self) -> dict:
+        return {'name':self.name,
+                'description':self.description,
+                'column_types':self.column_types,
+                'column_descriptoins':self.column_descriptions}
+    
+    @property
     def name(self) -> str:
         """Get the dataframe name"""
         return self._obj.attrs['super']['name']
@@ -586,7 +593,7 @@ def read_pickle(path: str) -> pd.DataFrame:
         df.super._infer_column_types()
     return df
     
-def read_csv(path: str, include_metadata: bool = True, **kwargs) -> pd.DataFrame:
+def read_csv(path: str, include_metadata: bool = False, **kwargs) -> pd.DataFrame:
     """
     Read a CSV file into a DataFrame with super accessor metadata.
     
@@ -594,7 +601,7 @@ def read_csv(path: str, include_metadata: bool = True, **kwargs) -> pd.DataFrame
     -----------
     path : str
         Path to the CSV file
-    include_metadata : bool, default True
+    include_metadata : bool, default False
         If True, raises FileNotFoundError when metadata file is not found
         If False, initializes empty metadata when metadata file is not found
     **kwargs : dict

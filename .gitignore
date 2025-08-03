@@ -214,6 +214,8 @@ logs/
 *.pth
 *.pt
 *.ckpt
+__pycache__
+*.pyc
 
 # API keys and secrets
 .env
