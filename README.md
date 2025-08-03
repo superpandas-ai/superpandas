@@ -26,6 +26,13 @@ SuperPandas is a lightweight Python package that extends the well known Pandas l
 - **Drop-in replacement for Pandas DataFrames**: SuperPandas is a lightweight wrapper around pandas DataFrames, so you can use it as a drop-in replacement for your existing code.
 - **Templated Prompt Generation** Easily store and use templates for system and user prompts.
 
+### LangGraph Agent for Code Execution
+- **Intelligent Code Generation**: Automatically generates Python code based on natural language queries
+- **Safe Code Execution**: Executes generated code in a controlled environment
+- **Error Reflection**: Analyzes errors and provides suggestions for fixes
+- **Iterative Improvement**: Retries failed code with improved suggestions
+- **Response Formatting**: Formats results into user-friendly responses
+
 ## Installation
 
 You can install SuperPandas using pip:
@@ -190,12 +197,39 @@ df.super.auto_describe(
 )
 
 # Query the DataFrame
-response = df.super.query(
-    "What are the key trends in this data?",
-    system_template=None,  # Optional custom system template
-    user_template=None  # Optional custom user template
+response = df.super.query("What are the key trends in this data?")
+```
+
+#### LangGraph Agent for Code Execution
+
+The LangGraph agent provides intelligent code execution for data analysis:
+
+```python
+# Basic usage with the agent
+result = df.super.analyze_with_agent(
+    query="Calculate the average salary by department",
+    max_iterations=5
+)
+
+print(result['formatted_response'])
+print(result['result'])
+
+# Direct agent usage
+from superpandas.langgraph_agent import run_agent
+
+result = run_agent(
+    query="Find employees with salary above the median",
+    dataframe=df,
+    max_iterations=3
 )
 ```
+
+The agent workflow:
+1. **Code Generation**: Generates Python code based on your query
+2. **Code Execution**: Safely executes the code
+3. **Error Handling**: If errors occur, reflects and tries again
+4. **Response Formatting**: Provides clear explanations of results
+
 
 ### Serialization
 
@@ -324,8 +358,8 @@ The default/loaded configuration persists across module reloads and is shared ac
     *   Extending metadata merging to DataFrame methods like `concat`, `merge`, `join`, etc.
     *   Extending metadata to methods like checking equality, copy, etc.
 *   **LLM Integration Improvements:**
-    *   More sophisticated automated analysis and insight generation.
-    *   Support for fine-tuning LLMs on specific datasets.
+    *   More sophisticated automated analysis and insight generation using agents.
+    *   Add Code Execution.
     *   Integration with a wider range of LLM providers and models.
     *   Adding support for chat history in LLM interactions.
 *   **Multi-DataFrame and Database Support:**

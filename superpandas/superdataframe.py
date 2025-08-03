@@ -3,7 +3,7 @@ import warnings
 import pandas as pd
 import json
 import yaml
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional, Any
 
 from .config import SuperPandasConfig
 from .llm_client import LLMClient, LLMResponse, LLMMessage
@@ -558,6 +558,31 @@ class SuperDataFrameAccessor:
         # TODO: add a chat history.
         """
         return self.llm_client.query(messages=messages)
+    
+    def analyze_with_agent(self, query: str, max_iterations: int = 5) -> Dict[str, Any]:
+        """
+        Analyze the DataFrame using a LangGraph agent for code execution.
+        
+        Parameters:
+        -----------
+        query : str
+            The analysis query to perform
+        max_iterations : int, default 5
+            Maximum number of iterations for the agent to try fixing errors
+            
+        Returns:
+        --------
+        Dict[str, Any]
+            The agent's final state including results and any errors
+        """
+        from .langgraph_agent import run_agent
+        
+        return run_agent(
+            query=query,
+            dataframe=self._obj,
+            config=self.config,
+            max_iterations=max_iterations
+        )
 
 def read_pickle(path: str, **kwargs) -> pd.DataFrame:
     """

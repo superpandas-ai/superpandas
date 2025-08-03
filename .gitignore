@@ -216,6 +216,7 @@ logs/
 *.ckpt
 __pycache__
 *.pyc
+dist/
 
 # API keys and secrets
 .env
