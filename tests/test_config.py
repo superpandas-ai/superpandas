@@ -22,8 +22,8 @@ class TestConfig:
         config = SuperPandasConfig()
         
         # Test initial values
-        assert config.model == "meta-llama/Llama-3.2-3B-Instruct"
-        assert config.provider == "hf"
+        assert config.model == "gpt-3.5-turbo"
+        assert config.provider == "openai"
         assert config.llm_kwargs == {}
         
         # Test setting values

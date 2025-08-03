@@ -5,6 +5,7 @@ SuperPandas: Enhanced pandas DataFrames with metadata and LLM integration
 from .superdataframe import create_super_dataframe, read_csv, read_pickle
 from .llm_client import LLMClient
 from .config import SuperPandasConfig
+from .providers import available_providers
 
 # Initialize default config, which will load from saved file if it exists
 default_config = SuperPandasConfig.get_default_config()
@@ -38,4 +39,5 @@ __all__ = [
     'SuperPandasConfig',
     'default_config',
     'set_default_config',
+    'available_providers',
 ] 

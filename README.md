@@ -59,7 +59,8 @@ df = pd.DataFrame({
 # Method 1: Create a SuperDataFrame explicitly with metadata
 import superpandas as spd
 
-sdf = spd.create_super_dataframe(df,
+sdf = spd.create_super_dataframe(
+    df=df,
     name="sales_data",
     description="Monthly sales data by region",
     column_descriptions={
@@ -89,7 +90,7 @@ df.super.set_column_descriptions({
 })
 print(df.super.name) # prints 'sales data'
 print(df.super.description) # 'Monthly sales data by region'
-print(df.super.get_column_descriptions())
+print(df.super.column_descriptions)
 print(df.super.column_types) # produces a dict of column names and data types ('object' data type is converted to more finegraned datatype)
 ```
 
@@ -110,7 +111,7 @@ df.super.set_column_descriptions({
 
 # Get column information
 description = df.super.get_column_description("column_name")
-all_descriptions = df.super.get_column_descriptions()
+all_descriptions = df.super.column_descriptions
 column_types = df.super.column_types
 
 # Refresh column type inference
@@ -121,66 +122,71 @@ df.super.refresh_column_types()
 ```python
 # Generate schema in different formats
 schema = df.super.get_schema(
-    template=None,  # Optional custom template
     format_type='text',  # Options: 'json', 'markdown', 'text', 'yaml'
     max_rows=5  # Number of sample rows to include
 )
 
 # Custom schema template
 template = """
-# {name}
-{description}
+DataFrame Name: {name}
+DataFrame Description: {description}
 
-## Data Structure
-Rows: {shape[0]}
-Columns: {shape[1]}
+Shape: {shape}
 
-## Columns
-{columns}
+Columns:
+{column_info}
 """
 schema = df.super.get_schema(template=template)
 ```
 
-### LLM Integration
+**Required template elements:**
+- `{name}`: DataFrame name
+- `{description}`: DataFrame description  
+- `{shape}`: DataFrame shape as string
+- `{column_info}`: Formatted column information
+
+**Optional template elements:**
+- `{columns}`: Raw column list (alternative to `{column_info}`)
+
+### LLM Integration and Usage
 
 SuperPandas supports multiple LLM providers through the `smolagents` package:
 
-- OpenAI API (`OpenAIServerModel`)
-- Hugging Face API (`HfApiModel`)
-- LiteLLM (`LiteLLMModel`)
-- Azure OpenAI (`AzureOpenAIServerModel`)
-- VLLM (`VLLMModel`)
-- MLX (`MLXModel`)
-- Local Transformers (`TransformersModel`)
+```python
+from superpandas import available_providers
+
+# List available providers
+providers = available_providers
+print(providers.keys())
+```
+
+Available providers:
+- `lite`: LiteLLM (`LiteLLMModel`)
+- `openai`: OpenAI API (`OpenAIServerModel`)
+- `hf`: Hugging Face API (`HfApiModel`)
+- `tf`: Local Transformers (`TransformersModel`)
+- `vllm`: VLLM (`VLLMModel`)
+- `mlx`: MLX (`MLXModel`)
+- `openai_az`: Azure OpenAI (`AzureOpenAIServerModel`)
+- `bedrock`: Amazon Bedrock (`AmazonBedrockServerModel`)
 
 ```python
-from superpandas import SuperPandasConfig, LLMClient
-# List available providers
-providers = LLMClient.available_providers()
-print(providers.keys())
+from superpandas import SuperPandasConfig
 
-# Initialize LLM config
+# Initialize config
 config = SuperPandasConfig()
-config.provider = 'HfApiModel'  # Available providers: LiteLLMModel, OpenAIServerModel, HfApiModel, TransformersModel, VLLMModel, MLXModel, AzureOpenAIServerModel
+config.provider = 'hf'  # Available providers: 'lite', 'openai', 'hf', 'tf', 'vllm', 'mlx', 'openai_az', 'bedrock'
 config.model = "meta-llama/Llama-3.2-3B-Instruct"
 
 # Configure at the DataFrame level
 df.super.config = config
 
-# Access and configure the LLM client directly
-df.super.llm_client = LLMClient(
-    model="gpt-3.5-turbo",
-    provider=providers['OpenAIServerModel']
-)
-
 # Auto-describe your DataFrame
 df.super.auto_describe(
-    config=None,  # Optional SuperPandasConfig instance
     generate_name=True,
     generate_description=True,
     generate_column_descriptions=True,
-    existing_values='warn',  # Options: 'warn', 'skip', 'overwrite'
-    **model_kwargs  # Additional arguments for the model provider
+    existing_values='warn'  # Options: 'warn', 'skip', 'overwrite'
 )
 
 # Query the DataFrame
@@ -199,7 +205,7 @@ response = df.super.query(
 df.super.to_csv("data.csv", include_metadata=True, index=False)
 # This will save all the metadata into a file data_metadata.json alongwith the actual data in data.csv.
 
-# Load with metadata (Note it overloads pandas read_csv instead)
+# Load with metadata (it overloads pandas read_csv)
 df = spd.read_csv("data.csv", include_metadata=True)  # Raises FileNotFoundError if metadata not found
 df = spd.read_csv("data.csv", include_metadata=False)  # Initializes empty metadata if not found
 
@@ -208,16 +214,16 @@ df.super.read_metadata("data.csv")
 ```
 #### Pickle
 ```python
-# Save to pickle
+# Save to pickle with metadata
 df.super.to_pickle("data.pkl")
 
-# Read from pickle
+# Read from pickle (it overloads pandas read_pickle)
 df = spd.read_pickle("data.pkl")
 ```
 
 ### Configuration
 
-The `SuperPandasConfig` class manages global configuration settings:
+The `SuperPandasConfig` class manages global configuration settings. The configuration is automatically saved to `~/.cache/superpandas/config.json` and persists across sessions, allowing you to set global defaults like `provider` and `model` once for your entire installation.
 
 ```python
 from superpandas import SuperPandasConfig
@@ -226,7 +232,7 @@ from superpandas import SuperPandasConfig
 config = SuperPandasConfig()
 
 # Available settings
-config.provider = 'HfApiModel'  # LLM provider
+config.provider = 'hf'  # LLM provider ('lite', 'openai', 'hf', 'tf', 'vllm', 'mlx', 'openai_az', 'bedrock')
 config.model = "meta-llama/Llama-3.2-3B-Instruct"  # Model name
 config.llm_kwargs = {'existing_values': 'warn'}  # Additional LLM arguments
 config.system_template = "..."  # System prompt template
@@ -241,12 +247,62 @@ config.save()  # Saves to ~/.cache/superpandas/config.json
 config.load()  # Loads from default path
 ```
 
+#### Configuration Hierarchy and Override Options
+
+The configuration system supports multiple levels of customization:
+
+1. **Global Default Configuration** (persists across sessions):
+   ```python
+   # Set global defaults that apply to all DataFrames
+   config = SuperPandasConfig()
+   config.provider = 'openai'
+   config.model = 'gpt-4'
+   spd.set_default_config(config)  # Saves to ~/.cache/superpandas/config.json
+   ```
+
+2. **Per-DataFrame Configuration** (overrides global for specific DataFrame):
+   ```python
+   # Override config for a specific DataFrame
+   df.super.config = SuperPandasConfig()
+   df.super.config.provider = 'hf'
+   df.super.config.model = 'meta-llama/Llama-3.2-3B-Instruct'
+   ```
+
+3. **Configuration at Creation Time**:
+   ```python
+   # Set config when creating a SuperDataFrame
+   custom_config = SuperPandasConfig()
+   custom_config.provider = 'vllm'
+   custom_config.model = 'llama-3.2-3b'
+   
+   sdf = spd.create_super_dataframe(
+       df=df,
+       name="my_data",
+       config=custom_config
+   )
+   ```
+
+4. **Temporary Configuration Override**:
+   ```python
+   # Temporarily change config for specific operations
+   original_config = df.super.config
+   df.super.config.provider = 'openai'
+   df.super.config.model = 'gpt-3.5-turbo'
+   
+   # Perform operations with temporary config
+   df.super.auto_describe()
+   
+   # Restore original config
+   df.super.config = original_config
+   ```
+
 The default configuration is automatically loaded when the library is imported. You can:
 1. Create a new configuration and set it as default using `spd.set_default_config()`
 2. Modify the existing default configuration directly
 3. Save and load configurations to/from disk
+4. Set the config when creating a superdataframe using `create_super_dataframe()`
 
-The default configuration persists across module reloads and is shared across all DataFrames unless explicitly overridden.
+The default/loaded configuration persists across module reloads and is shared across all DataFrames unless explicitly overridden.
 
 ### Error Handling
 
@@ -265,10 +321,17 @@ The default configuration persists across module reloads and is shared across al
     *   Advanced data validation and schema enforcement.
     *   Support for more complex data types (e.g., nested structures, geospatial data).
     *   Enhanced time-series data handling.
+    *   Extending metadata merging to DataFrame methods like `concat`, `merge`, `join`, etc.
+    *   Extending metadata to methods like checking equality, copy, etc.
 *   **LLM Integration Improvements:**
     *   More sophisticated automated analysis and insight generation.
     *   Support for fine-tuning LLMs on specific datasets.
     *   Integration with a wider range of LLM providers and models.
+    *   Adding support for chat history in LLM interactions.
+*   **Multi-DataFrame and Database Support:**
+    *   Extending SuperDataFrame to have multiple DataFrames with foreign key support.
+    *   Providing AI interface to RDBMS systems.
+    *   Support for complex relational data operations with metadata preservation.
 *   **Expanded Serialization Options:**
     *   Support for additional storage formats (e.g., Parquet, Avro) with metadata.
     *   Integration with data versioning systems (e.g., DVC).

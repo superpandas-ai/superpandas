@@ -43,8 +43,8 @@ class SuperPandasConfig:
         load_saved : bool, default False
             Whether to load saved configuration from file
         """
-        self._provider: str = "hf"
-        self.model: str = "meta-llama/Llama-3.2-3B-Instruct"
+        self._provider: str = "openai"
+        self.model: str = "gpt-3.5-turbo"
         self.llm_kwargs: Dict[str, Any] = {}
         self._existing_values: Literal['warn', 'skip', 'overwrite'] = 'warn'
         self.system_template: str = system_template  # Default from templates.py

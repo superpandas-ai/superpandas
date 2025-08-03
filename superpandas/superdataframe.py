@@ -384,10 +384,10 @@ class SuperDataFrameAccessor:
                 
         return result
     
-    def to_pickle(self, path: str):
+    def to_pickle(self, path: str, **kwargs):
         """Save DataFrame to pickle with metadata preserved"""
         # Save DataFrame with metadata in attrs
-        self._obj.to_pickle(path)
+        self._obj.to_pickle(path, **kwargs)
 
     def to_csv(self, path, include_metadata: bool = True, **kwargs):
         """
@@ -481,15 +481,17 @@ class SuperDataFrameAccessor:
         if existing_values is None:
             existing_values = self.config.existing_values
         
-        if generate_name and (not self.name or existing_values == 'overwrite'):
-            self.name = self.llm_client.generate_df_name(self._obj)
-        elif generate_name and self.name and existing_values == 'warn':
-            warnings.warn(f"DataFrame already has a name: '{self.name}'. Skipping name generation.")
+        if generate_name:
+            if not self.name or existing_values == 'overwrite':
+                self.name = self.llm_client.generate_df_name(self._obj)
+            elif self.name and existing_values == 'warn':
+                warnings.warn(f"DataFrame already has a name: '{self.name}'. Skipping name generation.")
         
-        if generate_description and (not self.description or existing_values == 'overwrite'):
-            self.description = self.llm_client.generate_df_description(self._obj)
-        elif generate_description and self.description and existing_values == 'warn':
-            warnings.warn("DataFrame already has a description. Skipping description generation.")
+        if generate_description:
+            if not self.description or existing_values == 'overwrite':
+                self.description = self.llm_client.generate_df_description(self._obj)
+            elif self.description and existing_values == 'warn':
+                warnings.warn("DataFrame already has a description. Skipping description generation.")
         
         if generate_column_descriptions:
             existing_cols = {col: desc for col, desc in self.column_descriptions.items() if desc}
@@ -557,7 +559,7 @@ class SuperDataFrameAccessor:
         """
         return self.llm_client.query(messages=messages)
 
-def read_pickle(path: str) -> pd.DataFrame:
+def read_pickle(path: str, **kwargs) -> pd.DataFrame:
     """
     Read a DataFrame from pickle with super accessor metadata.
     
@@ -578,7 +580,7 @@ def read_pickle(path: str) -> pd.DataFrame:
     >>> df = spd.read_pickle('data.pkl')
     """
     try:
-        df = pd.read_pickle(path)
+        df = pd.read_pickle(path, **kwargs)
     except FileNotFoundError:
         raise FileNotFoundError(f"Pickle file not found: {path}")
     
@@ -652,18 +654,46 @@ def read_csv(path: str, include_metadata: bool = False, **kwargs) -> pd.DataFram
     return df
 
 # Helper function to create a SuperDataFrameAccessor
-def create_super_dataframe(*args, **kwargs) -> pd.DataFrame:
+def create_super_dataframe(df:pd.DataFrame,
+                           name:str="",
+                           description:str="",
+                           column_descriptions:Dict[str,str]={},
+                           column_types:Dict[str,str]={},
+                           config:SuperPandasConfig=None) -> pd.DataFrame:
     """
     Create a DataFrame with initialized super accessor metadata.
-    
-    This is a convenience function that works like pd.DataFrame() but initializes
-    the super accessor metadata.
+
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        The DataFrame to create a super accessor for
+    name : str, default ""
+        The name of the DataFrame
+    description : str, default ""
+        The description of the DataFrame
+    column_descriptions : Dict[str,str], default {}
+        The descriptions of the columns
+    column_types : Dict[str,str], default {}
+        The types of the columns. Overrides the types inferred from the DataFrame.
+    config : SuperPandasConfig, default None
+        The config to use for the super accessor. If None, uses the default config.
+        If config is provided, it will override the default config.
+
+    Returns:
+    --------
+    pd.DataFrame
+        SuperDataFrame with initialized 'super' accessor metadata
+
+    Examples:
+    ---------
+    >>> import superpandas as spd
+    >>> # Create a DataFrame with metadata
+    >>> df = spd.create_super_dataframe(df, name="My DataFrame", description="This is a description", column_descriptions={"col1": "This is a description", "col2": "This is a description"}, column_types={"col1": "int", "col2": "float"})
+    >>> 
+    >>> # Create a DataFrame without metadata
+    >>> df = spd.create_super_dataframe(df)
     """
-    name = kwargs.pop('name', '')
-    description = kwargs.pop('description', '')
-    column_descriptions = kwargs.pop('column_descriptions', None)
     
-    df = pd.DataFrame(*args, **kwargs)
     df.attrs['super'] = {
         'name': name,
         'description': description,
@@ -671,5 +701,6 @@ def create_super_dataframe(*args, **kwargs) -> pd.DataFrame:
         'column_types': {}
     }
     df.super._infer_column_types()
-    df.super.config = SuperPandasConfig.get_default_config()
+    df.super.column_types.update(column_types)
+    df.super.config = config or SuperPandasConfig.get_default_config()
     return df 

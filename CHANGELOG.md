@@ -7,13 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] - 2025-08-03
+### Added
+- Improved test coverage for serialization and metadata
+- Enhanced documentation on readthedocs
+### Changed
+- Updated README for clarity and usage examples
+### Fixed
+- Refactored `create_super_dataframe` with parameters
+- CSV serialization now preserves index and metadata correctly
+### Removed
+- LLMClient is no longer user-adjustable
+
 ## [0.3.2] - 2025-06-07
 ### Added
 - readthedocs documentation
 ### Fixed
 - column_descriptions API
-### Fixed
 - logo url
+
 
 ## [0.3.0] - 2025-06-01
 ### Added

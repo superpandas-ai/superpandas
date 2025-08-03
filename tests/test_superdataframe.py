@@ -59,10 +59,9 @@ class TestSuperDataFrameBasics:
         assert 'super' in df.attrs
         
         # Test creating from scratch
-        df = create_super_dataframe({
-            'a': [1, 2, 3],
-            'b': ['x', 'y', 'z']
-        }, name="New DF")
+        data = {'a': [1, 2, 3], 'b': ['x', 'y', 'z']}
+        df = pd.DataFrame(data)
+        df = create_super_dataframe(df, name="New DF")
         assert 'super' in df.attrs
         assert df.super.name == "New DF"
     
@@ -329,8 +328,10 @@ class TestSuperDataFrameIO:
     def test_read_pickle(self, tmp_path):
         """Test read_pickle and to_pickle with super metadata"""
         # Create test data
+        data = {'A': [1, 2, 3], 'B': ['x', 'y', 'z']}
+        df = pd.DataFrame(data)
         original_df = create_super_dataframe(
-            {'A': [1, 2, 3], 'B': ['x', 'y', 'z']},
+            df,
             name="Pickle Test",
             description="Test Pickle file",
             column_descriptions={'A': 'Numbers', 'B': 'Letters'}

@@ -17,8 +17,9 @@ def sample_df():
         'date_col': pd.date_range('2023-01-01', periods=3)
     }
     
+    df = pd.DataFrame(data)
     df = create_super_dataframe(
-        data,
+        df,
         name='test_df',
         description='A test dataframe',
         column_descriptions={
@@ -173,8 +174,10 @@ class TestSerialization:
     def test_pickle_serialization_new_interface(self, temp_dir):
         """Test pickle serialization and deserialization with the new interface"""
         # Create test data
+        data = {'A': [1, 2, 3], 'B': ['x', 'y', 'z']}
+        df = pd.DataFrame(data)
         df = create_super_dataframe(
-            {'A': [1, 2, 3], 'B': ['x', 'y', 'z']},
+            df,
             name="Test DF",
             description="Test description",
             column_descriptions={
@@ -201,8 +204,10 @@ class TestSerialization:
     def test_pickle_serialization_new_interface_empty(self, temp_dir):
         """Test pickle serialization and deserialization with the new interface when column descriptions are empty"""
         # Create test data
+        data = {'A': [1, 2, 3], 'B': ['x', 'y', 'z']}
+        df = pd.DataFrame(data)
         df = create_super_dataframe(
-            {'A': [1, 2, 3], 'B': ['x', 'y', 'z']},
+            df,
             name="Test DF",
             description="Test description"
         )

@@ -44,24 +44,6 @@ class LLMClient:
     :ivar config: The `SuperPandasConfig` instance used for configuration.
     """
 
-    @staticmethod
-    def available_providers() -> List[str]:
-        """
-        Get a list of all available LLM providers from `smolagents` which are installed on your system.
-
-        :return: A list of available provider names (e.g., 'openai')
-        :rtype: List[str]
-
-        Example::
-
-            available_providers = LLMClient.available_providers()
-            if 'openai' in available_providers:
-                client = LLMClient(model="gpt-3.5-turbo", provider='openai')
-            else:
-                print("OpenAI provider not available.")
-        """
-        return list(available_providers.keys())
-
     def __init__(self,
                  model: Optional[Union[str, Model]] = None,
                  provider: Optional[str] = None,
@@ -236,78 +218,20 @@ class LLMClient:
         return self.query(prompt).content.strip()
 
 
-# class DummyLLMClient(LLMClient):
-#     """
-#     A dummy LLM client for testing and development purposes.
+    @staticmethod
+    def available_providers() -> List[str]:
+        """
+        Get a list of all available LLM providers from `smolagents` which are installed on your system.
 
-#     This client does not make any actual API calls. Instead, it returns predefined
-#     dummy responses. It inherits from `LLMClient` but overrides its core methods.
-#     """
+        :return: A list of available provider names (e.g., 'openai')
+        :rtype: List[str]
 
-#     def __init__(self, *args, **kwargs):
-#         """
-#         Initialize the DummyLLMClient.
+        Example::
 
-#         Ignores all arguments and skips parent initialization to avoid actual model loading.
-#         """
-#         # Skip parent __init__ by calling object's __init__ or just pass
-#         # A bit of a trick to avoid LLMClient's __init__ logic effectively
-#         super(LLMClient, self).__init__()
-#         self.model = self  # Makes sure self.model is not None for internal checks
-
-#     def query(self, prompt: Union[str, LLMMessage, List[LLMMessage]], **kwargs) -> LLMResponse:
-#         """
-#         Return a dummy response acknowledging the prompt.
-
-#         :param prompt: The input prompt.
-#         :type prompt: Union[str, LLMMessage, List[LLMMessage]]
-#         :param kwargs: Additional keyword arguments (ignored).
-#         :return: A dummy `LLMResponse`.
-#         :rtype: LLMResponse
-#         """
-#         return LLMResponse(content=f"This is a dummy response for prompt: {prompt}")
-
-#     def generate_df_name(self, df: pd.DataFrame) -> str:
-#         """
-#         Return a dummy DataFrame name.
-
-#         :param df: The DataFrame (ignored).
-#         :type df: pd.DataFrame
-#         :return: The string "dummy_dataframe_name".
-#         :rtype: str
-#         """
-#         return "dummy_dataframe_name"
-
-#     def generate_df_description(self, df: pd.DataFrame) -> str:
-#         """
-#         Return a dummy DataFrame description.
-
-#         :param df: The DataFrame (ignored).
-#         :type df: pd.DataFrame
-#         :return: A fixed dummy description string.
-#         :rtype: str
-#         """
-#         return "This is a dummy response for DataFrame description."
-
-#     def generate_column_descriptions(self, df: pd.DataFrame) -> dict:
-#         """
-#         Return dummy descriptions for each column in the DataFrame.
-
-#         :param df: The DataFrame.
-#         :type df: pd.DataFrame
-#         :return: A dictionary mapping column names to a fixed dummy description.
-#         :rtype: dict
-#         """
-#         return {col: "This is a dummy response for column description." for col in df.columns}
-
-#     def __call__(self, payload, **kwargs):
-#         """
-#         Mock the model's `__call__` method to return a dummy response.
-#         Needed because `self.model` is set to `self`.
-
-#         :param payload: The payload (ignored).
-#         :param kwargs: Additional keyword arguments (ignored).
-#         :return: A dummy `LLMResponse`.
-#         :rtype: LLMResponse
-#         """
-#         return LLMResponse(content="This is a dummy response")
+            available_providers = LLMClient.available_providers()
+            if 'openai' in available_providers:
+                client = LLMClient(model="gpt-3.5-turbo", provider='openai')
+            else:
+                print("OpenAI provider not available.")
+        """
+        return list(available_providers.keys())
