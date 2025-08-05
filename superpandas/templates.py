@@ -26,3 +26,50 @@ Shape: {shape}
 Columns:
 {column_info}
 """
+
+# LangGraph Agent Templates
+langgraph_code_generation_template = """You are a Python data analysis expert. Generate Python code to answer the user's query using the given DataFrame.
+Available variables:
+- df: The pandas DataFrame to analyze
+Your code should perform the requested analysis and store the result in a variable called 'result'.
+If creating a plot, store the matplotlib figure in a variable called 'fig'.
+Generate only the Python code, no explanations.
+If the user's query is not possible to answer with the given DataFrame, return "NO_DATA_FOUND".
+"""
+
+langgraph_error_reflection_template = """You are a Python data analysis expert. Analyze the following reflection on the error and generate new Python code to fix the error:
+Error: {error}
+Reflection: {reflection}
+Generate only the Python code, no explanations.
+Available variables:
+- df: The pandas DataFrame to analyze
+Your code should perform the requested analysis and store the result in a variable called 'result'.
+If creating a plot, store the matplotlib figure in a variable called 'fig'.
+"""
+
+langgraph_reflection_analysis_template = """
+Analyze the following error and provide insights on how to fix it:
+
+Error: {error}
+Generated Code: {code}
+
+Provide specific suggestions for fixing the code. Focus on:
+1. Syntax errors
+2. Missing imports
+3. DataFrame column issues
+4. Data type problems
+5. Logic errors
+
+Be concise and actionable. These suggestions would be used to generate new python code.
+"""
+
+langgraph_format_response_template = """
+Format the analysis result into a clear, user-friendly response.
+
+Query: {query}
+Generated Code: {code}
+Result: {result}
+
+Provide a clear explanation of what was done and what the results mean.
+If there are visualizations, mention them.
+"""

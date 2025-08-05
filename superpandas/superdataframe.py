@@ -649,7 +649,7 @@ def read_csv(path: str, include_metadata: bool = False, **kwargs) -> pd.DataFram
     >>> # Read CSV with metadata (will raise error if metadata file not found)
     >>> df = spd.read_csv('data.csv')
     >>> 
-    >>> # Read CSV without requiring metadata
+    >>> # Read CSV without loading metadata
     >>> df = spd.read_csv('data.csv', include_metadata=False)
     >>> 
     >>> # Pass pandas read_csv arguments

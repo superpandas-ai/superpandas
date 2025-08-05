@@ -8,9 +8,15 @@ import pandas as pd
 import json
 import traceback
 
-from .llm_client import LLMClient, LLMMessage, LLMResponse
-from .config import SuperPandasConfig
-from .utils.codeparser import CodeBlobOutputParser
+from superpandas.llm_client import LLMClient, LLMMessage, LLMResponse
+from superpandas.config import SuperPandasConfig
+from superpandas.utils import CodeExecutor, CodeBlobOutputParser
+from superpandas.templates import (
+    langgraph_code_generation_template,
+    langgraph_error_reflection_template,
+    langgraph_reflection_analysis_template,
+    langgraph_format_response_template
+)
 
 class AgentState(TypedDict):
     """State for the LangGraph agent"""
@@ -52,6 +58,14 @@ def create_langgraph_agent(
     
     # Create output parsers
     code_parser = CodeBlobOutputParser()
+    
+    executor = CodeExecutor(
+            executor_type="local",
+            code_block_tags = "markdown",
+            additional_authorized_imports=[
+                "pandas", "numpy", "matplotlib", "seaborn"
+            ]
+        )
 
     # Define the nodes for our graph
     # Node 1: Generate code
@@ -71,17 +85,25 @@ def create_langgraph_agent(
         # Get the messages
         messages = state["messages"]
 
-        # Generate the code
-        try:
+        # If we are generating code after reflection, we need to add the reflection to the messages
+        if messages[-1].role == "assistant": 
+            reflection = messages[-1].content
+            error = state["error"]
+            system_msg = langgraph_error_reflection_template.format(
+                error=error,
+                reflection=reflection
+            )
+        else:
             # Create messages for the LLM
-            system_msg = "You are a Python data analysis expert. Generate Python code to analyze the given DataFrame.\n\nAvailable variables:\n- df: The pandas DataFrame to analyze\n\nYour code should:\n1. Perform the requested analysis\n2. Store the result in a variable called 'result'\n3. If creating a plot, store the matplotlib figure in a variable called 'fig'\n4. Handle errors gracefully\n5. Return meaningful results\n\nGenerate only the Python code, no explanations."
-            user_msg = f"DataFrame schema:\n{schema}\n\nUser query: {current_query}"
-            
-            llm_messages = [
-                LLMMessage(role='system', content=system_msg),
-                LLMMessage(role='user', content=user_msg)
-            ]
-            
+            system_msg = langgraph_code_generation_template
+        user_msg = f"DataFrame schema:\n{schema}\n\nUser query: {current_query}"
+        
+        llm_messages = [
+            LLMMessage(role='system', content=system_msg),
+            LLMMessage(role='user', content=user_msg)
+        ]
+        # Generate the code
+        try:    
             response = llm_client.query(messages=llm_messages)
             generated_code = code_parser.parse(response.content)
         except Exception as e:
@@ -103,12 +125,10 @@ def create_langgraph_agent(
         generated_code = state["generated_code"]
         df = state["dataframe"]
 
+        df_var = df.attrs['super']['name'] if df.attrs['super']['name']!='' else 'df'
+
         local_env = {
-            'df': df,
-            'pd': pd,
-            'json': json,
-            'result': None,
-            'fig': None
+            df_var: df,
         }
 
         if generated_code == "NO_DATA_FOUND" or not generated_code.strip():
@@ -143,21 +163,10 @@ def create_langgraph_agent(
         code = state["generated_code"]
 
         # Generate reflection
-        reflection_prompt_text = f"""
-        Analyze the following error and provide insights on how to fix it:
-        
-        Error: {error}
-        Generated Code: {code}
-        
-        Provide specific suggestions for fixing the code. Focus on:
-        1. Syntax errors
-        2. Missing imports
-        3. DataFrame column issues
-        4. Data type problems
-        5. Logic errors
-        
-        Be concise and actionable.
-        """
+        reflection_prompt_text = langgraph_reflection_analysis_template.format(
+            error=error,
+            code=code
+        )
         
         llm_messages = [
             LLMMessage(role='system', content='You are a Python debugging expert.'),
@@ -185,16 +194,11 @@ def create_langgraph_agent(
         generated_code = state["generated_code"]
 
         # Format the response
-        format_prompt_text = f"""
-        Format the analysis result into a clear, user-friendly response.
-        
-        Query: {state["current_query"]}
-        Generated Code: {generated_code}
-        Result: {result}
-        
-        Provide a clear explanation of what was done and what the results mean.
-        If there are visualizations, mention them.
-        """
+        format_prompt_text = langgraph_format_response_template.format(
+            query=state["current_query"],
+            code=generated_code,
+            result=result
+        )
         
         llm_messages = [
             LLMMessage(role='system', content='You are a data analysis expert who explains results clearly.'),
@@ -318,3 +322,9 @@ def run_agent(
     final_state = agent.invoke(initial_state)
     
     return final_state 
+
+if __name__ == "__main__":
+    import superpandas as spd
+    sdf = spd.read_csv("/home/haris/git/superpandas/tests/titanic_sdf.csv")
+    output = run_agent(query="what's the age distribution for different genders", dataframe=sdf)
+    print(output)
