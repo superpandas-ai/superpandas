@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from unittest.mock import Mock, patch
 
-from superpandas.langgraph_agent import create_langgraph_agent, run_agent, AgentState
+from superpandas.langgraph_agent import LangGraphAgent, AgentState
 from superpandas.config import SuperPandasConfig
 
 
@@ -16,11 +16,12 @@ class TestLangGraphAgent:
     def test_create_langgraph_agent(self):
         """Test that the agent can be created successfully"""
         config = SuperPandasConfig()
-        agent = create_langgraph_agent(config=config)
+        agent = LangGraphAgent(config=config)
         
-        # Check that the agent is a compiled StateGraph
-        assert hasattr(agent, 'invoke')
-        assert callable(agent.invoke)
+        # Check that the agent has the expected attributes
+        assert hasattr(agent, 'graph')
+        assert hasattr(agent, 'run')
+        assert callable(agent.run)
     
     def test_agent_state_structure(self):
         """Test that AgentState has the correct structure"""
@@ -52,18 +53,17 @@ class TestLangGraphAgent:
         """Test running the agent with a simple query"""
         # Mock the LLM client
         mock_client = Mock()
-        mock_client.model = Mock()
-        mock_client.model.invoke.return_value = "result = df.head()"
+        mock_client.query.return_value = Mock(content="result = df.head()")
         mock_llm_client.return_value = mock_client
         
         # Create a simple DataFrame
         df = pd.DataFrame({'A': [1, 2, 3], 'B': [4, 5, 6]})
         
-        # Run the agent
-        result = run_agent(
+        # Create agent and run
+        agent = LangGraphAgent(max_iterations=1)
+        result = agent.run(
             query="Show the first few rows",
-            dataframe=df,
-            max_iterations=1
+            dataframe=df
         )
         
         # Check that the result contains the expected keys
@@ -74,7 +74,7 @@ class TestLangGraphAgent:
     
     def test_code_blob_output_parser(self):
         """Test the CodeBlobOutputParser"""
-        from superpandas.langgraph_agent import CodeBlobOutputParser
+        from superpandas.utils import CodeBlobOutputParser
         
         parser = CodeBlobOutputParser()
         
@@ -106,10 +106,10 @@ class TestLangGraphAgent:
         
         # This should not raise an exception even if the LLM is not available
         try:
-            result = run_agent(
+            agent = LangGraphAgent(max_iterations=1)
+            result = agent.run(
                 query="Invalid query that might fail",
-                dataframe=df,
-                max_iterations=1
+                dataframe=df
             )
             assert isinstance(result, dict)
         except Exception as e:
