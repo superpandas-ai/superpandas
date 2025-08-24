@@ -44,3 +44,12 @@ Configuration (`superpandas.config`)
 .. autoclass:: superpandas.config.SuperPandasConfig
    :members:
    :undoc-members:
+
+SQL Accessor (`superpandas.pandasql`)
+-------------------------------------
+
+.. automodule:: superpandas.pandasql
+
+.. autoclass:: superpandas.pandasql.SQLAccessor
+   :members:
+   :undoc-members:

@@ -5,6 +5,32 @@ Usage Guide
 
 This guide provides an overview of how to use SuperPandas, from creating enhanced DataFrames to leveraging its AI capabilities.
 
+Quick Start
+-----------
+
+SQL Querying
+~~~~~~~~~~~~
+
+.. code-block:: python
+
+   import pandas as pd
+   import superpandas  # Registers SQL accessor
+
+   # Create DataFrames
+   df1 = pd.DataFrame({"id": [1, 2, 3], "name": ["Alice", "Bob", "Charlie"]})
+   df2 = pd.DataFrame({"id": [1, 2], "dept": ["Engineering", "Sales"]})
+
+   # Basic SQL query
+   result = df1.sql.query("SELECT * FROM df WHERE id > 1")
+
+   # Join multiple DataFrames
+   env = {"employees": df1, "departments": df2}
+   result = df1.sql.query("""
+       SELECT e.name, d.dept 
+       FROM df e 
+       JOIN departments d ON e.id = d.id
+   """, env=env)
+
 Creating SuperDataFrame
 -----------------------
 
@@ -69,8 +95,158 @@ You can create a SuperDataFrame in the following two ways (For more information 
    print(df.super.column_descriptions)
    print(df.super.column_types)
 
+SQL Querying with DataFrames
+----------------------------
+
+SuperPandas provides a powerful SQL accessor that allows you to query pandas DataFrames using familiar SQL syntax:
+
+.. code-block:: python
+
+   import pandas as pd
+   import superpandas  # This registers the SQL accessor
+
+   # Basic SQL operations
+   df = pd.DataFrame({
+       "name": ["Alice", "Bob", "Charlie"],
+       "age": [25, 30, 35],
+       "salary": [50000, 60000, 70000]
+   })
+
+   # Simple filtering
+   result = df.sql.query("SELECT * FROM df WHERE age > 28")
+
+   # Aggregations
+   result = df.sql.query("SELECT AVG(salary) as avg_salary, COUNT(*) as count FROM df")
+
+   # String operations
+   result = df.sql.query("SELECT UPPER(name) as upper_name, LENGTH(name) as name_length FROM df")
+
+   # Working with multiple DataFrames
+   df2 = pd.DataFrame({
+       "name": ["Alice", "Bob"],
+       "department": ["Engineering", "Sales"]
+   })
+
+   env = {"employees": df, "departments": df2}
+   result = df.sql.query("""
+       SELECT e.name, e.salary, d.department
+       FROM df e
+       JOIN departments d ON e.name = d.name
+       ORDER BY e.salary DESC
+   """, env=env)
+
 Core Methods
 ------------
+
+SQL Query Accessor
+~~~~~~~~~~~~~~~~~~
+
+SuperPandas includes a powerful SQL accessor that allows you to execute SQL queries on pandas DataFrames using SQLite as the backend engine. This feature brings the power of SQL to pandas DataFrames, enabling complex data operations with familiar SQL syntax.
+
+.. note::
+   The SQL accessor functionality is inspired by and builds upon concepts from the `pandasql <https://github.com/yhat/pandasql>`_ project. We acknowledge and thank the pandasql contributors for their work. See :ref:`license` for more information about third-party licenses.
+
+**Basic Usage:**
+
+.. code-block:: python
+
+   import pandas as pd
+   import superpandas  # This registers the SQL accessor
+
+   # Create sample DataFrames
+   df1 = pd.DataFrame({
+       "id": [1, 2, 3],
+       "name": ["Alice", "Bob", "Charlie"],
+       "age": [25, 30, 35]
+   })
+
+   df2 = pd.DataFrame({
+       "id": [1, 2, 4],
+       "department": ["Engineering", "Sales", "Marketing"],
+       "salary": [80000, 70000, 75000]
+   })
+
+   # Basic SQL query
+   result = df1.sql.query("SELECT * FROM df WHERE age > 28")
+
+   # Query with additional tables
+   env = {"employees": df1, "departments": df2}
+   result = df1.sql.query("""
+       SELECT e.name, e.age, d.department, d.salary
+       FROM df e
+       JOIN departments d ON e.id = d.id
+       WHERE e.age > 25
+   """, env=env)
+
+   # Aggregation queries
+   result = df1.sql.query("SELECT AVG(age) as avg_age, COUNT(*) as count FROM df")
+
+   # Complex queries with multiple tables
+   result = df1.sql.query("""
+       SELECT 
+           d.department,
+           AVG(e.age) as avg_age,
+           SUM(d.salary) as total_salary
+       FROM df e
+       JOIN departments d ON e.id = d.id
+       GROUP BY d.department
+       HAVING AVG(e.age) > 25
+   """, env=env)
+
+**Advanced SQL Features:**
+
+.. code-block:: python
+
+   # String functions and pattern matching
+   result = df.sql.query("""
+       SELECT 
+           name,
+           UPPER(name) as upper_name,
+           LENGTH(name) as name_length
+       FROM df 
+       WHERE name LIKE '%a%'
+   """)
+
+   # Date functions
+   result = df.sql.query("""
+       SELECT 
+           name,
+           created_date,
+           STRFTIME('%Y-%m', created_date) as year_month
+       FROM df 
+       ORDER BY created_date
+   """)
+
+   # Conditional logic with CASE statements
+   result = df.sql.query("""
+       SELECT 
+           name,
+           score,
+           CASE 
+               WHEN score >= 90 THEN 'Excellent'
+               WHEN score >= 80 THEN 'Good'
+               WHEN score >= 70 THEN 'Average'
+               ELSE 'Needs Improvement'
+           END as grade
+       FROM df 
+       ORDER BY score DESC
+   """)
+
+   # Custom database URI for persistent storage
+   result = df.sql.query(
+       "SELECT * FROM df WHERE x > 1",
+       db_uri="sqlite:///my_database.db"
+   )
+
+**Key Features:**
+- **In-memory SQLite**: Uses SQLite in-memory database for fast queries
+- **Multiple Tables**: Support for joining multiple DataFrames via the `env` parameter
+- **Full SQL Support**: Supports all standard SQL operations (SELECT, WHERE, JOIN, GROUP BY, HAVING, ORDER BY, etc.)
+- **Type Safety**: Comprehensive error handling and validation
+- **Custom Database**: Option to use custom database URIs for persistent storage
+- **String & Date Functions**: Full support for SQLite string and date manipulation functions
+- **Conditional Logic**: CASE statements and complex WHERE clauses
+- **Aggregations**: GROUP BY, HAVING, and all standard aggregation functions
 
 Metadata Management
 ~~~~~~~~~~~~~~~~~~~

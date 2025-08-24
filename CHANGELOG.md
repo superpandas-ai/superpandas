@@ -6,8 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.4.0] - 2025-08-24
 ### Added
+- SQL accessor for pandas DataFrames with SQLite backend
+- Support for complex SQL queries including JOINs, aggregations, and string functions
+- Multiple table support via environment parameter
+- Custom database URI support for persistent storage
+- Comprehensive error handling and validation for SQL queries
 - Basic langgraph codeagent
+### Changed
+- Renamed tutorials directory to examples for better organization
 
 ## [0.3.4] - 2025-08-03
 ### Added

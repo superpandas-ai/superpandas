@@ -9,6 +9,11 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 [Unreleased]
 Added
 ~~~~~
+- SQL accessor for pandas DataFrames with SQLite backend
+- Support for complex SQL queries including JOINs, aggregations, and string functions
+- Multiple table support via environment parameter
+- Custom database URI support for persistent storage
+- Comprehensive error handling and validation for SQL queries
 - Basic langgraph codeagent
 ------------
 

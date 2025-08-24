@@ -7,6 +7,9 @@ from .llm_client import LLMClient
 from .config import SuperPandasConfig
 from .providers import available_providers
 
+# Import SQL accessor to register it with pandas
+from . import pandasql
+
 # Initialize default config, which will load from saved file if it exists
 default_config = SuperPandasConfig.get_default_config()
 
@@ -40,4 +43,5 @@ __all__ = [
     'default_config',
     'set_default_config',
     'available_providers',
+    'pandasql',  # Export the SQL module for direct access if needed
 ] 

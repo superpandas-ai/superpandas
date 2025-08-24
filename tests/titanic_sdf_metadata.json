@@ -16,13 +16,5 @@
     "Sex": "str",
     "Age": "float64",
     "Fare": "float64"
-  },
-  "dtypes": {
-    "PassengerId": "int64",
-    "Survived": "int64",
-    "Name": "object",
-    "Sex": "object",
-    "Age": "float64",
-    "Fare": "float64"
   }
 }
